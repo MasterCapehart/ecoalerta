@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './DashboardMunicipal.css'
-import Estadisticas from './Estadisticas.jsx'
+import { API_ENDPOINTS } from '../config'
 
 // Fix iconos Leaflet
 import L from 'leaflet'
@@ -17,49 +17,79 @@ function DashboardMunicipal() {
   const [vistaActual, setVistaActual] = useState('mapa')
   const [reporteSeleccionado, setReporteSeleccionado] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [reportes, setReportes] = useState([])
+  const [estadisticas, setEstadisticas] = useState({
+    total: 0,
+    nuevos: 0,
+    en_proceso: 0,
+    resueltos: 0
+  })
+  const [loading, setLoading] = useState(true)
+  const [filtroEstado, setFiltroEstado] = useState('')
 
-  // Datos de ejemplo
-  const reportes = [
-    { 
-      codigo: 'ABC-1234', 
-      fecha: '15/01/2025', 
-      lat: -29.9533, 
-      lng: -71.3395, 
-      ubicacion: 'Av. Principal 123', 
-      categoria: 'Domésticos', 
-      estado: 'nuevo',
-      descripcion: 'Acumulación de basura doméstica'
-    },
-    { 
-      codigo: 'DEF-5678', 
-      fecha: '14/01/2025', 
-      lat: -29.9600, 
-      lng: -71.3300, 
-      ubicacion: 'Calle 2', 
-      categoria: 'Escombros', 
-      estado: 'proceso',
-      descripcion: 'Escombros de construcción'
-    },
-    { 
-      codigo: 'GHI-9012', 
-      fecha: '13/01/2025', 
-      lat: -29.9450, 
-      lng: -71.3450, 
-      ubicacion: 'Sector Norte', 
-      categoria: 'Electrónicos', 
-      estado: 'resuelto',
-      descripcion: 'Residuos electrónicos'
-    },
-  ]
+  // Cargar reportes y estadísticas
+  useEffect(() => {
+    fetchReportes()
+    fetchEstadisticas()
+  }, [filtroEstado])
+
+  const fetchReportes = async () => {
+    setLoading(true)
+    try {
+      const url = filtroEstado ? `${API_ENDPOINTS.REPORTES}?estado=${filtroEstado}` : API_ENDPOINTS.REPORTES
+      const response = await fetch(url)
+      const data = await response.json()
+      setReportes(Array.isArray(data) ? data : data.results || [])
+    } catch (error) {
+      console.error('Error al cargar reportes:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchEstadisticas = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.ESTADISTICAS)
+      const data = await response.json()
+      setEstadisticas(data)
+    } catch (error) {
+      console.error('Error al cargar estadísticas:', error)
+    }
+  }
 
   const handleVerDetalle = (reporte) => {
     setReporteSeleccionado(reporte)
     setShowModal(true)
   }
 
-  const handleGuardarCambios = () => {
-    alert('Cambios guardados exitosamente')
-    setShowModal(false)
+  const handleGuardarCambios = async () => {
+    if (!reporteSeleccionado) return
+
+    const nuevoEstado = document.querySelector('select').value
+    const notasInternas = document.querySelector('textarea').value
+
+    try {
+      const response = await fetch(`${API_ENDPOINTS.REPORTES}${reporteSeleccionado.id}/actualizar_estado/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          estado: nuevoEstado,
+          notas_internas: notasInternas
+        })
+      })
+
+      if (response.ok) {
+        fetchReportes()
+        fetchEstadisticas()
+        setShowModal(false)
+        alert('Cambios guardados exitosamente')
+      }
+    } catch (error) {
+      console.error('Error al actualizar:', error)
+      alert('Error al guardar cambios')
+    }
   }
 
   return (
@@ -107,19 +137,19 @@ function DashboardMunicipal() {
           <div className="stats-container">
             <div className="stat-card stat-nuevos">
               <h3>Nuevos</h3>
-              <div className="number">15</div>
+              <div className="number">{estadisticas.nuevos}</div>
             </div>
             <div className="stat-card stat-proceso">
               <h3>En Proceso</h3>
-              <div className="number">8</div>
+              <div className="number">{estadisticas.en_proceso}</div>
             </div>
             <div className="stat-card stat-resueltos">
               <h3>Resueltos</h3>
-              <div className="number">42</div>
+              <div className="number">{estadisticas.resueltos}</div>
             </div>
             <div className="stat-card stat-total">
               <h3>Total</h3>
-              <div className="number">65</div>
+              <div className="number">{estadisticas.total}</div>
             </div>
           </div>
 
@@ -127,7 +157,7 @@ function DashboardMunicipal() {
           <div className="filters-bar">
             <div className="filter-group">
               <label>Estado</label>
-              <select>
+              <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
                 <option value="">Todos</option>
                 <option value="nuevo">Nuevo</option>
                 <option value="proceso">En Proceso</option>
@@ -151,38 +181,59 @@ function DashboardMunicipal() {
           {/* Vista Mapa */}
           {vistaActual === 'mapa' && (
             <div className="map-view">
-              <MapContainer
-                center={[-29.9533, -71.3395]}
-                zoom={12}
-                style={{ height: '100%', width: '100%' }}
-              >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; OpenStreetMap contributors'
-                />
-                {reportes.map(reporte => (
-                  <Marker key={reporte.codigo} position={[reporte.lat, reporte.lng]}>
-                    <Popup>
-                      <b>{reporte.codigo}</b><br/>
-                      {reporte.ubicacion}<br/>
-                      <button 
-                        onClick={() => handleVerDetalle(reporte)}
-                        style={{
-                          marginTop: '5px',
-                          padding: '5px 10px',
-                          background: '#228B22',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Ver Detalle
-                      </button>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
+              {loading ? (
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center', 
+                  height: '100%',
+                  fontSize: '16px',
+                  color: '#666'
+                }}>
+                  Cargando mapa...
+                </div>
+              ) : (
+                <MapContainer
+                  center={[-29.9533, -71.3395]}
+                  zoom={12}
+                  style={{ height: '100%', width: '100%', minHeight: '500px' }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; OpenStreetMap contributors'
+                  />
+                  {reportes
+                    .filter(reporte => reporte.lat && reporte.lng)
+                    .map(reporte => (
+                    <Marker 
+                      key={reporte.id || reporte.codigo_seguimiento} 
+                      position={[reporte.lat, reporte.lng]}
+                    >
+                      <Popup>
+                        <div>
+                          <b>{reporte.codigo_seguimiento}</b><br/>
+                          {reporte.categoria_nombre}<br/>
+                          <small>{reporte.direccion || 'Sin dirección'}</small><br/>
+                          <button 
+                            onClick={() => handleVerDetalle(reporte)}
+                            style={{
+                              marginTop: '5px',
+                              padding: '5px 10px',
+                              background: '#228B22',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Ver Detalle
+                          </button>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+              )}
             </div>
           )}
 
@@ -201,29 +252,41 @@ function DashboardMunicipal() {
                   </tr>
                 </thead>
                 <tbody>
-                  {reportes.map(reporte => (
-                    <tr key={reporte.codigo}>
-                      <td>{reporte.codigo}</td>
-                      <td>{reporte.fecha}</td>
-                      <td>{reporte.ubicacion}</td>
-                      <td>{reporte.categoria}</td>
-                      <td>
-                        <span className={`status-badge status-${reporte.estado}`}>
-                          {reporte.estado.toUpperCase()}
-                        </span>
-                      </td>
-                      <td>
-                        <button 
-                          className="btn-action"
-                          onClick={() => handleVerDetalle(reporte)}
-                        >
-                          Ver
-                        </button>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>
+                        Cargando reportes...
                       </td>
                     </tr>
-                  ))}
-                  {/* Vista Estadísticas */}
-                  {vistaActual === 'estadisticas' && <Estadisticas />}
+                  ) : reportes.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>
+                        No hay reportes disponibles
+                      </td>
+                    </tr>
+                  ) : (
+                    reportes.map(reporte => (
+                      <tr key={reporte.id || reporte.codigo_seguimiento}>
+                        <td>{reporte.codigo_seguimiento}</td>
+                        <td>{new Date(reporte.fecha_creacion).toLocaleDateString()}</td>
+                        <td>{reporte.direccion || 'Sin dirección'}</td>
+                        <td>{reporte.categoria_nombre || 'Sin categoría'}</td>
+                        <td>
+                          <span className={`status-badge status-${reporte.estado}`}>
+                            {reporte.estado.toUpperCase()}
+                          </span>
+                        </td>
+                        <td>
+                          <button 
+                            className="btn-action"
+                            onClick={() => handleVerDetalle(reporte)}
+                          >
+                            Ver
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -243,22 +306,22 @@ function DashboardMunicipal() {
             
             <div className="detail-group">
               <label>Código</label>
-              <p>{reporteSeleccionado.codigo}</p>
+              <p>{reporteSeleccionado.codigo_seguimiento}</p>
             </div>
 
             <div className="detail-group">
               <label>Fecha</label>
-              <p>{reporteSeleccionado.fecha}</p>
+              <p>{new Date(reporteSeleccionado.fecha_creacion).toLocaleString()}</p>
             </div>
 
             <div className="detail-group">
-              <label>Ubicación</label>
-              <p>{reporteSeleccionado.ubicacion}</p>
+              <label>Categoría</label>
+              <p>{reporteSeleccionado.categoria_nombre}</p>
             </div>
 
             <div className="detail-group">
               <label>Descripción</label>
-              <p>{reporteSeleccionado.descripcion}</p>
+              <p>{reporteSeleccionado.descripcion || 'Sin descripción'}</p>
             </div>
 
             <div className="form-group">

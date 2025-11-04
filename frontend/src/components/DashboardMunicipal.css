@@ -55,6 +55,8 @@
   width: 250px;
   background: white;
   box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+  z-index: 10;
+  position: relative;
 }
 
 .nav-item {
@@ -80,7 +82,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
+  position: relative;
 }
 
 .stats-container {
@@ -89,6 +92,9 @@
   gap: 15px;
   padding: 20px;
   background: white;
+  z-index: 10;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .stat-card {
@@ -129,6 +135,9 @@
   gap: 15px;
   align-items: center;
   box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  z-index: 10;
+  position: relative;
+  flex-shrink: 0;
 }
 
 .filter-group {
@@ -177,6 +186,16 @@
   flex: 1;
   padding: 20px;
   background: white;
+  min-height: 400px;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.map-view .leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  z-index: 1;
 }
 
 .table-view {

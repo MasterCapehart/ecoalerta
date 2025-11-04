@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './ReporteForm.css'
 import logo from '../assets/images/Ecoalerta-logo-min.png'
+import { API_ENDPOINTS } from '../config'
 
 // Fix para iconos de Leaflet en React
 import L from 'leaflet'
@@ -33,6 +34,8 @@ function ReporteForm() {
   const [email, setEmail] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [codigoSeguimiento, setCodigoSeguimiento] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [categorias, setCategorias] = useState([])
 
   const handleLocationSelect = (latlng) => {
     setUbicacion(latlng)
@@ -50,40 +53,64 @@ function ReporteForm() {
     }
   }
 
-  const generateTrackingCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    let code = ''
-    for (let i = 0; i < 3; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length))
+  // Cargar categorías al montar el componente
+  useEffect(() => {
+    const fetchCategorias = async () => {
+      try {
+        const response = await fetch(API_ENDPOINTS.CATEGORIAS)
+        const data = await response.json()
+        setCategorias(Array.isArray(data) ? data : data.results || [])
+      } catch (error) {
+        console.error('Error al cargar categorías:', error)
+      }
     }
-    code += '-'
-    for (let i = 0; i < 4; i++) {
-      code += Math.floor(Math.random() * 10)
-    }
-    return code
-  }
+    fetchCategorias()
+  }, [])
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setLoading(true)
     
     if (!ubicacion) {
       alert('Por favor, selecciona una ubicación en el mapa')
+      setLoading(false)
       return
     }
 
-    // Simulación de envío
-    const codigo = generateTrackingCode()
-    setCodigoSeguimiento(codigo)
-    setShowModal(true)
+    if (!categoria) {
+      alert('Por favor, selecciona una categoría')
+      setLoading(false)
+      return
+    }
 
-    // Conexión backend
-    console.log({
-      ubicacion,
-      categoria,
-      descripcion,
-      foto,
-      email
-    })
+    try {
+      const formData = new FormData()
+      formData.append('categoria', categoria)
+      formData.append('descripcion', descripcion)
+      if (email) formData.append('email', email)
+      if (foto) formData.append('foto', foto)
+      formData.append('lat', ubicacion.lat)
+      formData.append('lng', ubicacion.lng)
+
+      const response = await fetch(API_ENDPOINTS.REPORTES, {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (data.codigo_seguimiento) {
+        setCodigoSeguimiento(data.codigo_seguimiento)
+        setShowModal(true)
+      } else {
+        alert(data.error || 'Error al enviar el reporte')
+      }
+    } catch (error) {
+      console.error('Error al enviar reporte:', error)
+      alert('Error al conectar con el servidor. Verifica que el backend esté corriendo.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const resetForm = () => {
@@ -164,12 +191,9 @@ function ReporteForm() {
                   required
                 >
                   <option value="">Seleccione una opción</option>
-                  <option value="domesticos">Residuos Domésticos</option>
-                  <option value="escombros">Escombros de Construcción</option>
-                  <option value="electronicos">Residuos Electrónicos</option>
-                  <option value="organicos">Residuos Orgánicos</option>
-                  <option value="peligrosos">Residuos Peligrosos</option>
-                  <option value="mixtos">Mixtos</option>
+                  {categorias.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                  ))}
                 </select>
               </div>
 
@@ -195,7 +219,9 @@ function ReporteForm() {
                 />
               </div>
 
-              <button type="submit" className="btn">Enviar Reporte</button>
+              <button type="submit" className="btn" disabled={loading}>
+                {loading ? 'Enviando...' : 'Enviar Reporte'}
+              </button>
             </form>
           </div>
         </div>
