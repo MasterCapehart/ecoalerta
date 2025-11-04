@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { useState, useEffect, useRef } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './DashboardMunicipal.css'
 import { API_ENDPOINTS } from '../config'
@@ -12,6 +12,232 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 })
+
+// Función para cargar leaflet.heat dinámicamente desde CDN
+// Esto asegura que el plugin se cargue correctamente en Vite
+const loadHeatPlugin = () => {
+  return new Promise((resolve, reject) => {
+    // Verificar si ya está cargado
+    if (typeof L !== 'undefined' && typeof L.heatLayer !== 'undefined') {
+      console.log('Heat plugin already loaded')
+      resolve()
+      return
+    }
+
+    // Verificar si el script ya existe
+    const existingScript = document.querySelector('script[data-heat-plugin]')
+    if (existingScript) {
+      existingScript.addEventListener('load', () => {
+        if (typeof L.heatLayer !== 'undefined') {
+          resolve()
+        } else {
+          reject(new Error('Plugin loaded but L.heatLayer not available'))
+        }
+      })
+      return
+    }
+
+    // Cargar desde CDN (más confiable que node_modules en Vite)
+    const script = document.createElement('script')
+    script.src = 'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js'
+    script.setAttribute('data-heat-plugin', 'true')
+    script.onload = () => {
+      // Esperar un momento para que L.heatLayer se registre
+      setTimeout(() => {
+        if (typeof L.heatLayer !== 'undefined') {
+          console.log('Heat plugin loaded successfully from CDN')
+          resolve()
+        } else {
+          console.error('Plugin loaded but L.heatLayer not found')
+          reject(new Error('Plugin loaded but L.heatLayer not available'))
+        }
+      }, 100)
+    }
+    script.onerror = () => {
+      console.error('Failed to load heat plugin from CDN')
+      reject(new Error('Could not load leaflet.heat plugin'))
+    }
+    document.head.appendChild(script)
+  })
+}
+
+// Componente para la capa de heatmap
+function HeatmapLayer({ data, enabled }) {
+  const map = useMap()
+  const heatmapRef = useRef(null)
+  const clickHandlerRef = useRef(null)
+  const [pluginLoaded, setPluginLoaded] = useState(false)
+
+  // Cargar el plugin una vez cuando el componente se monta
+  useEffect(() => {
+    loadHeatPlugin()
+      .then(() => {
+        setPluginLoaded(true)
+      })
+      .catch((error) => {
+        console.error('Error loading heat plugin:', error)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (!map || !pluginLoaded) {
+      return
+    }
+
+    // Limpiar capa anterior si existe
+    if (heatmapRef.current) {
+      map.removeLayer(heatmapRef.current)
+      heatmapRef.current = null
+    }
+
+    // Remover handler de clic anterior si existe
+    if (clickHandlerRef.current) {
+      map.off('click', clickHandlerRef.current)
+      clickHandlerRef.current = null
+    }
+
+    if (!enabled) {
+      console.log('HeatmapLayer: Disabled')
+      return
+    }
+
+    if (!data || data.length === 0) {
+      console.log('HeatmapLayer: No data available', { dataLength: data?.length })
+      return
+    }
+
+    console.log('HeatmapLayer: Creating heatmap with', data.length, 'points')
+
+    // Verificar que L.heatLayer esté disponible
+    if (typeof L.heatLayer === 'undefined') {
+      console.error('L.heatLayer is not defined after loading plugin')
+      return
+    }
+
+    // Preparar datos para leaflet.heat
+    const heatData = data.map(point => [
+      point.lat,
+      point.lng,
+      point.intensity || point.densidad || 1
+    ])
+
+    console.log('HeatmapLayer: Heat data prepared', heatData.slice(0, 3))
+
+    // Calcular máximo para la intensidad
+    const maxIntensity = Math.max(...data.map(d => d.intensity || d.densidad || 1), 1)
+    console.log('HeatmapLayer: Max intensity', maxIntensity)
+
+    // Crear la capa de heatmap usando L.heatLayer (función factory)
+    try {
+      // Ajustar parámetros para hacer el heatmap más visible
+      // Aumentar radius y blur para que sea más visible con pocos puntos
+      const radius = Math.max(50, Math.min(100, 25 * Math.sqrt(data.length)))
+      const blur = Math.max(20, Math.min(40, 15 * Math.sqrt(data.length)))
+      
+      console.log('HeatmapLayer: Creating with params', { radius, blur, maxIntensity, dataPoints: data.length })
+      
+      heatmapRef.current = L.heatLayer(heatData, {
+        radius: radius,
+        blur: blur,
+        maxZoom: 17,
+        minOpacity: 0.3, // Hacer más visible
+        gradient: {
+          0.0: 'blue',
+          0.3: 'cyan',
+          0.5: 'lime',
+          0.7: 'yellow',
+          0.9: 'orange',
+          1.0: 'red'
+        },
+        max: maxIntensity
+      })
+
+      heatmapRef.current.addTo(map)
+      
+      // Asegurar que el heatmap esté por encima de otros elementos y sea visible
+      if (heatmapRef.current._canvas) {
+        heatmapRef.current._canvas.style.zIndex = '650'
+        heatmapRef.current._canvas.style.pointerEvents = 'none'
+        // Forzar redraw para asegurar que se renderice
+        setTimeout(() => {
+          if (heatmapRef.current && heatmapRef.current.redraw) {
+            heatmapRef.current.redraw()
+            console.log('HeatmapLayer: Forced redraw')
+          }
+        }, 100)
+      }
+      
+      // También forzar un evento de movimiento del mapa para activar el renderizado
+      map.fire('moveend')
+      
+      console.log('HeatmapLayer: Heatmap layer added to map successfully', {
+        layer: heatmapRef.current,
+        canvas: heatmapRef.current._canvas,
+        canvasStyle: heatmapRef.current._canvas?.style,
+        dataPoints: heatData.length,
+        heatData: heatData.slice(0, 3)
+      })
+    } catch (error) {
+      console.error('HeatmapLayer: Error creating heatmap layer', error)
+      console.error('Error details:', error.message, error.stack)
+    }
+
+    // Crear handler de clic para mostrar popup de hotspots
+    clickHandlerRef.current = function(e) {
+      const clickedPoint = e.latlng
+      
+      // Buscar el punto más cercano dentro de un radio razonable
+      let closestPoint = null
+      let minDistance = Infinity
+      
+      data.forEach(point => {
+        const pointLatLng = L.latLng(point.lat, point.lng)
+        const distance = clickedPoint.distanceTo(pointLatLng)
+        
+        // Radio de detección en metros (aproximadamente 500m)
+        if (distance < 500 && distance < minDistance) {
+          minDistance = distance
+          closestPoint = point
+        }
+      })
+      
+      if (closestPoint) {
+        const popup = L.popup()
+          .setLatLng([closestPoint.lat, closestPoint.lng])
+          .setContent(`
+            <div style="padding: 10px;">
+              <h3 style="margin: 0 0 10px 0; font-size: 16px;">🔥 Hotspot de Vertederos</h3>
+              <p style="margin: 5px 0;"><strong>Densidad:</strong> ${closestPoint.densidad} reportes</p>
+              <p style="margin: 5px 0;"><strong>Intensidad:</strong> ${closestPoint.intensity}</p>
+              <p style="margin: 5px 0; font-size: 12px; color: #666;">
+                Ubicación: ${closestPoint.lat.toFixed(4)}, ${closestPoint.lng.toFixed(4)}
+              </p>
+              <p style="margin: 10px 0 0 0; font-size: 11px; color: #999;">
+                Esta zona concentra una alta cantidad de reportes de vertederos
+              </p>
+            </div>
+          `)
+          .openOn(map)
+      }
+    }
+
+    // Agregar evento de clic
+    map.on('click', clickHandlerRef.current)
+
+    return () => {
+      if (heatmapRef.current) {
+        map.removeLayer(heatmapRef.current)
+        heatmapRef.current = null
+      }
+      if (clickHandlerRef.current) {
+        map.off('click', clickHandlerRef.current)
+        clickHandlerRef.current = null
+      }
+    }
+  }, [map, data, enabled, pluginLoaded])
+
+  return null
+}
 
 function DashboardMunicipal() {
   const [vistaActual, setVistaActual] = useState('mapa')
@@ -26,12 +252,70 @@ function DashboardMunicipal() {
   })
   const [loading, setLoading] = useState(true)
   const [filtroEstado, setFiltroEstado] = useState('')
+  const [heatmapEnabled, setHeatmapEnabled] = useState(false)
+  const [heatmapData, setHeatmapData] = useState([])
+  const [loadingHeatmap, setLoadingHeatmap] = useState(false)
 
   // Cargar reportes y estadísticas
   useEffect(() => {
     fetchReportes()
     fetchEstadisticas()
   }, [filtroEstado])
+
+  // Cargar datos del heatmap cuando se activa
+  useEffect(() => {
+    if (heatmapEnabled && vistaActual === 'mapa') {
+      console.log('Heatmap enabled, fetching data...')
+      fetchHeatmapData()
+    } else if (!heatmapEnabled) {
+      // Limpiar datos cuando se desactiva
+      setHeatmapData([])
+    }
+  }, [heatmapEnabled, filtroEstado, vistaActual])
+
+  // Handler para cuando se cambia el checkbox
+  const handleHeatmapToggle = (checked) => {
+    console.log('Heatmap toggle:', checked)
+    setHeatmapEnabled(checked)
+    if (checked && vistaActual === 'mapa') {
+      // Cargar datos inmediatamente cuando se activa
+      fetchHeatmapData()
+    }
+  }
+
+  const fetchHeatmapData = async () => {
+    setLoadingHeatmap(true)
+    try {
+      const params = new URLSearchParams()
+      if (filtroEstado) {
+        params.append('estado', filtroEstado)
+      }
+      
+      const url = `${API_ENDPOINTS.HEATMAP}?${params.toString()}`
+      console.log('Fetching heatmap data from:', url)
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('Heatmap data received:', data)
+      
+      if (data.data && Array.isArray(data.data)) {
+        setHeatmapData(data.data)
+        console.log('Heatmap data set, points:', data.data.length)
+      } else {
+        console.warn('No heatmap data found in response:', data)
+        setHeatmapData([])
+      }
+    } catch (error) {
+      console.error('Error al cargar datos del heatmap:', error)
+      setHeatmapData([])
+    } finally {
+      setLoadingHeatmap(false)
+    }
+  }
 
   const fetchReportes = async () => {
     setLoading(true)
@@ -176,6 +460,26 @@ function DashboardMunicipal() {
               <input type="text" placeholder="Buscar por código..." />
               <button className="btn-filter">Filtrar</button>
             </div>
+            {vistaActual === 'mapa' && (
+              <div className="heatmap-control">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={heatmapEnabled}
+                    onChange={(e) => handleHeatmapToggle(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span style={{ fontWeight: 500 }}>🔥 Mapa de Calor</span>
+                  {loadingHeatmap && <span style={{ fontSize: '12px', color: '#666' }}>(Cargando...)</span>}
+                  {heatmapEnabled && !loadingHeatmap && heatmapData.length === 0 && (
+                    <span style={{ fontSize: '12px', color: '#ff6b6b' }}>(Sin datos)</span>
+                  )}
+                  {heatmapEnabled && !loadingHeatmap && heatmapData.length > 0 && (
+                    <span style={{ fontSize: '12px', color: '#228B22' }}>({heatmapData.length} puntos)</span>
+                  )}
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Vista Mapa */}
@@ -202,7 +506,10 @@ function DashboardMunicipal() {
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution='&copy; OpenStreetMap contributors'
                   />
-                  {reportes
+                  {/* Capa de Heatmap */}
+                  <HeatmapLayer data={heatmapData} enabled={heatmapEnabled} />
+                  {/* Marcadores de reportes */}
+                  {!heatmapEnabled && reportes
                     .filter(reporte => reporte.lat && reporte.lng)
                     .map(reporte => (
                     <Marker 

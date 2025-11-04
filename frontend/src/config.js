@@ -6,5 +6,6 @@ export const API_ENDPOINTS = {
   REPORTES: `${API_URL}/api/reportes/`,
   CATEGORIAS: `${API_URL}/api/categorias/`,
   ESTADISTICAS: `${API_URL}/api/reportes/estadisticas/`,
+  HEATMAP: `${API_URL}/api/analytics/heatmap/`,
 };
 
