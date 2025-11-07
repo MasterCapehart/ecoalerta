@@ -31,7 +31,14 @@ jobs:
           # Copiar staticwebapp.config.json al directorio dist (Azure lo busca ahí)
           cp staticwebapp.config.json dist/ || echo "staticwebapp.config.json no encontrado, continuando..."
           # Verificar que los archivos se construyeron correctamente
-          ls -la dist/ | head -20
+          echo "=== Contenido de dist/ ==="
+          ls -la dist/
+          echo ""
+          echo "=== Contenido de dist/assets/ ==="
+          ls -la dist/assets/ || echo "No hay carpeta assets"
+          echo ""
+          echo "=== Primeras líneas de index.html ==="
+          head -20 dist/index.html
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
       - name: Build And Deploy
