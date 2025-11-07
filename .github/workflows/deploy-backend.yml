@@ -84,9 +84,9 @@ jobs:
     
     - name: Desplegar usando ZIP Deploy API
       run: |
-        USERNAME="${{ steps.extract-creds.outputs.username }}"
-        PASSWORD="${{ steps.extract-creds.outputs.password }}"
-        PUBLISH_URL="${{ steps.extract-creds.outputs.publish_url }}"
+        USERNAME="${{ steps.deploy-creds.outputs.username }}"
+        PASSWORD="${{ steps.deploy-creds.outputs.password }}"
+        PUBLISH_URL="${{ steps.deploy-creds.outputs.publish_url }}"
         
         if [ -z "$PUBLISH_URL" ]; then
           echo "❌ Error: PUBLISH_URL está vacío"
