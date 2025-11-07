@@ -37,12 +37,14 @@ INSTALLED_APPS = [
     'django.contrib.gis',  # PostGIS support - habilitado para Azure PostgreSQL
     'rest_framework',
     'corsheaders',  # CORS support
+    'whitenoise.runserver_nostatic',  # WhiteNoise para servir archivos estáticos
     'reportes',
 ]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # WhiteNoise debe ir después de SecurityMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -151,14 +153,35 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5173',
 ]
 
+# Agregar orígenes de Azure desde variables de entorno
+azure_frontend_url = os.getenv('AZURE_FRONTEND_URL', '')
+if azure_frontend_url:
+    CORS_ALLOWED_ORIGINS.append(azure_frontend_url)
+
 CORS_ALLOW_CREDENTIALS = True
+
+# WhiteNoise configuration para servir archivos estáticos
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Custom user model
 AUTH_USER_MODEL = 'reportes.Usuario'
 
-# GDAL Configuration for PostGIS (macOS)
+# GDAL Configuration for PostGIS
 import platform
 if platform.system() == 'Darwin':  # macOS
     GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH', '/opt/homebrew/lib/libgdal.dylib')
     GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH', '/opt/homebrew/lib/libgeos_c.dylib')
+elif platform.system() == 'Linux':  # Azure Linux
+    # Azure App Service usa estas rutas por defecto
+    GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH', '/usr/lib/libgdal.so')
+    GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH', '/usr/lib/libgeos_c.so')
+
+# Configuración de seguridad para producción
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
 

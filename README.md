@@ -137,6 +137,34 @@ npm run dev
 - Categorías: `GET /api/categorias/`
 - Estadísticas: `GET /api/reportes/estadisticas/`
 
+## 🚀 Despliegue en Azure con CI/CD
+
+Este proyecto está configurado para desplegarse automáticamente en Azure usando GitHub Actions.
+
+### Configuración Rápida
+
+1. **Ejecuta el script de configuración:**
+   ```bash
+   ./setup-azure.sh
+   ```
+
+2. **Configura los secrets en GitHub:**
+   - Ve a tu repositorio → Settings → Secrets and variables → Actions
+   - Agrega los secrets necesarios (ver `AZURE_DEPLOY.md`)
+
+3. **Haz push a `main`:**
+   - Los cambios se desplegarán automáticamente
+
+### Documentación Completa
+
+Para instrucciones detalladas, consulta: **[AZURE_DEPLOY.md](AZURE_DEPLOY.md)**
+
+### Recursos Creados
+
+- **Backend**: Azure App Service (Django)
+- **Frontend**: Azure Static Web Apps (React)
+- **Base de datos**: Azure PostgreSQL (ya configurado)
+
 ## Solución de problemas
 
 ### Windows
@@ -149,3 +177,8 @@ npm run dev
 - El puerto 5173 ocupado: Vite arrancará en otro puerto (p. ej. 5174).
 - 404 en `/`: es normal. Usa `/api/` o el frontend.
 - Si falta `venv`: vuelve a crear y reinstalar dependencias del backend.
+
+### Azure
+- **Error de despliegue**: Revisa los logs en GitHub Actions y Azure Portal
+- **CORS errors**: Verifica que `AZURE_FRONTEND_URL` esté configurado correctamente
+- **Base de datos no conecta**: Verifica las credenciales y el firewall de PostgreSQL
