@@ -28,8 +28,10 @@ jobs:
           cd frontend
           npm ci
           npm run build
-          # Copiar staticwebapp.config.json al directorio dist
+          # Copiar staticwebapp.config.json al directorio dist (Azure lo busca ahí)
           cp staticwebapp.config.json dist/ || echo "staticwebapp.config.json no encontrado, continuando..."
+          # Verificar que los archivos se construyeron correctamente
+          ls -la dist/ | head -20
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
       - name: Build And Deploy
