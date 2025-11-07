@@ -181,6 +181,11 @@ elif platform.system() == 'Linux':  # Azure Linux
 # IMPORTANTE: Siempre desactivar SECURE_SSL_REDIRECT para evitar bucles de redirección
 SECURE_SSL_REDIRECT = False
 
+# Desactivar todas las redirecciones relacionadas con seguridad
+SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+
 # Configuración de proxy headers para Azure App Service
 # Azure usa un proxy inverso, necesitamos indicarle a Django que confíe en los headers del proxy
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
