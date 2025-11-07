@@ -177,9 +177,15 @@ elif platform.system() == 'Linux':  # Azure Linux
     GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH', '/usr/lib/libgeos_c.so')
 
 # Configuración de seguridad para producción
+# Azure App Service ya maneja HTTPS, no necesitamos redirigir
+# IMPORTANTE: Siempre desactivar SECURE_SSL_REDIRECT para evitar bucles de redirección
+SECURE_SSL_REDIRECT = False
+
+# Configuración de proxy headers para Azure App Service
+# Azure usa un proxy inverso, necesitamos indicarle a Django que confíe en los headers del proxy
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 if not DEBUG:
-    # Azure App Service ya maneja HTTPS, no necesitamos redirigir
-    SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
