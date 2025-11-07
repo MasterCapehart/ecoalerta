@@ -62,19 +62,24 @@ jobs:
       run: |
         echo "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" > /tmp/publish-profile.xml
         echo "=== Verificando publish profile ==="
-        cat /tmp/publish-profile.xml | head -3
+        head -1 /tmp/publish-profile.xml
         
-        # Extraer credenciales - buscar en todos los perfiles
-        USERNAME=$(grep -o 'userName="[^"]*"' /tmp/publish-profile.xml | head -1 | sed 's/userName="//;s/"//')
-        PASSWORD=$(grep -o 'userPWD="[^"]*"' /tmp/publish-profile.xml | head -1 | sed 's/userPWD="//;s/"//')
-        PUBLISH_URL=$(grep -o 'publishUrl="[^"]*"' /tmp/publish-profile.xml | grep "scm" | head -1 | sed 's/publishUrl="//;s/"//;s/:443//')
+        # Extraer credenciales - funciona con o sin comillas
+        # Buscar userName=VALOR o userName="VALOR"
+        USERNAME=$(grep -oE 'userName=["]?[^" >]+["]?' /tmp/publish-profile.xml | head -1 | sed 's/userName=//;s/"//g')
+        PASSWORD=$(grep -oE 'userPWD=["]?[^" >]+["]?' /tmp/publish-profile.xml | head -1 | sed 's/userPWD=//;s/"//g')
+        PUBLISH_URL=$(grep -oE 'publishUrl=["]?[^" >]+["]?' /tmp/publish-profile.xml | grep "scm" | head -1 | sed 's/publishUrl=//;s/"//g;s/:443//')
         
         # Validar que las variables no estén vacías
         if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ] || [ -z "$PUBLISH_URL" ]; then
           echo "❌ Error: No se pudieron extraer las credenciales"
-          echo "USERNAME: ${USERNAME:+SET}" 
-          echo "PASSWORD: ${PASSWORD:+SET}"
-          echo "PUBLISH_URL: $PUBLISH_URL"
+          echo "USERNAME: '$USERNAME'"
+          echo "PASSWORD: '${PASSWORD:0:5}...'"
+          echo "PUBLISH_URL: '$PUBLISH_URL'"
+          echo ""
+          echo "=== Debug: Buscando patrones ==="
+          grep -o 'userName=[^ ]*' /tmp/publish-profile.xml | head -3
+          grep -o 'publishUrl=[^ ]*' /tmp/publish-profile.xml | grep scm | head -1
           exit 1
         fi
         
