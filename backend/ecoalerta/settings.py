@@ -178,7 +178,8 @@ elif platform.system() == 'Linux':  # Azure Linux
 
 # Configuración de seguridad para producción
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # Azure App Service ya maneja HTTPS, no necesitamos redirigir
+    SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True
