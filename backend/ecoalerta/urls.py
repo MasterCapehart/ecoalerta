@@ -3,18 +3,23 @@ URL configuration for ecoalerta project.
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 
 def root_view(request):
     """Vista raíz para evitar bucles de redirección"""
-    return JsonResponse({
+    # Devolver respuesta directa sin redirecciones
+    response = JsonResponse({
         'message': 'EcoAlerta API',
         'version': '1.0',
+        'status': 'ok',
         'endpoints': {
             'api': '/api/',
             'admin': '/admin/'
         }
     })
+    # Asegurar que no haya redirecciones
+    response.status_code = 200
+    return response
 
 urlpatterns = [
     path('', root_view, name='root'),
