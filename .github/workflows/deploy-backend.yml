@@ -50,49 +50,10 @@ jobs:
         pwd
         test -f startup.sh && echo "✅ startup.sh encontrado en $(pwd)" || echo "❌ startup.sh NO encontrado"
     
-    - name: Crear ZIP para despliegue
-      run: |
-        cd backend
-        zip -r ../backend-deploy.zip . -x "*.git*" "*.pyc" "__pycache__/*" "*.log" "venv/*" ".venv/*"
-        cd ..
-        ls -lh backend-deploy.zip
-    
-    - name: Desplegar usando credenciales de usuario
-      run: |
-        USERNAME="${{ secrets.AZURE_DEPLOY_USERNAME }}"
-        PASSWORD="${{ secrets.AZURE_DEPLOY_PASSWORD }}"
-        PUBLISH_URL="ecoalerta-backend-cmfbgrb3bgd0ephd.scm.chilecentral-01.azurewebsites.net"
-        
-        if [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
-          echo "❌ Error: Las credenciales no están configuradas"
-          echo "Configura estos secrets en GitHub:"
-          echo "  - AZURE_DEPLOY_USERNAME"
-          echo "  - AZURE_DEPLOY_PASSWORD"
-          exit 1
-        fi
-        
-        echo "=== Iniciando despliegue ==="
-        echo "URL: https://${PUBLISH_URL}/api/zipdeploy"
-        echo "Username: ${USERNAME:0:15}..."
-        
-        RESPONSE=$(curl -X POST \
-          -u "${USERNAME}:${PASSWORD}" \
-          --data-binary @backend-deploy.zip \
-          -H "Content-Type: application/zip" \
-          -w "\nHTTP_CODE:%{http_code}" \
-          "https://${PUBLISH_URL}/api/zipdeploy?isAsync=true" \
-          -s 2>&1)
-        
-        HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE" | cut -d: -f2)
-        BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE/d')
-        
-        echo "HTTP Code: $HTTP_CODE"
-        
-        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "202" ]; then
-          echo "✅ Despliegue iniciado correctamente (HTTP $HTTP_CODE)"
-        else
-          echo "❌ Error en el despliegue. HTTP Code: $HTTP_CODE"
-          echo "Response: $BODY"
-          exit 1
-        fi
+    - name: Desplegar a Azure App Service
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ./backend
 
