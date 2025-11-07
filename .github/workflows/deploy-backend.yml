@@ -45,6 +45,10 @@ jobs:
         echo ""
         echo "=== Verificando estructura del directorio ==="
         ls -la | head -10
+        echo ""
+        echo "=== Verificando que startup.sh esté en la raíz ==="
+        pwd
+        test -f startup.sh && echo "✅ startup.sh encontrado en $(pwd)" || echo "❌ startup.sh NO encontrado"
     
     - name: Desplegar a Azure App Service
       uses: azure/webapps-deploy@v3
