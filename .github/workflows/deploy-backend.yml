@@ -31,6 +31,14 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libpq-dev gdal-bin libgdal-dev python3-gdal
 
+    - name: Verificar archivos antes del despliegue
+      run: |
+        echo "=== Archivos en backend/ ==="
+        ls -la backend/ | head -20
+        echo ""
+        echo "=== Verificar startup.sh ==="
+        ls -la backend/startup.sh || echo "startup.sh no encontrado"
+    
     - name: Desplegar a Azure App Service
       uses: azure/webapps-deploy@v3
       with:
