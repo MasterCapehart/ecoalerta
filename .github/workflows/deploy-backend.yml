@@ -61,19 +61,45 @@ jobs:
       id: extract-creds
       run: |
         echo "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" > /tmp/publish-profile.xml
-        USERNAME=$(grep -oP 'userName="\K[^"]+' /tmp/publish-profile.xml | head -1)
-        PASSWORD=$(grep -oP 'userPWD="\K[^"]+' /tmp/publish-profile.xml | head -1)
-        PUBLISH_URL=$(grep -oP 'publishUrl="\K[^"]+' /tmp/publish-profile.xml | grep "scm" | head -1)
+        echo "=== Verificando publish profile ==="
+        head -5 /tmp/publish-profile.xml
+        
+        # Extraer credenciales usando sed (más compatible que grep -oP)
+        USERNAME=$(sed -n 's/.*userName="\([^"]*\)".*/\1/p' /tmp/publish-profile.xml | head -1)
+        PASSWORD=$(sed -n 's/.*userPWD="\([^"]*\)".*/\1/p' /tmp/publish-profile.xml | head -1)
+        PUBLISH_URL=$(sed -n 's/.*publishUrl="\([^"]*\)".*/\1/p' /tmp/publish-profile.xml | grep "scm" | head -1 | sed 's/:443//')
+        
         echo "username=$USERNAME" >> $GITHUB_OUTPUT
         echo "password=$PASSWORD" >> $GITHUB_OUTPUT
         echo "publish_url=$PUBLISH_URL" >> $GITHUB_OUTPUT
+        
         echo "✅ Credenciales extraídas"
+        echo "Username: ${USERNAME:0:10}..." # Mostrar solo primeros 10 caracteres por seguridad
+        echo "Publish URL: $PUBLISH_URL"
     
     - name: Desplegar usando ZIP Deploy API
       run: |
-        curl -X POST \
+        echo "=== Iniciando despliegue ==="
+        echo "URL: https://${{ steps.extract-creds.outputs.publish_url }}/api/zipdeploy"
+        
+        RESPONSE=$(curl -X POST \
           -u "${{ steps.extract-creds.outputs.username }}:${{ steps.extract-creds.outputs.password }}" \
           --data-binary @backend-deploy.zip \
           -H "Content-Type: application/zip" \
-          "https://${{ steps.extract-creds.outputs.publish_url }}/api/zipdeploy?isAsync=true"
+          -w "\nHTTP_CODE:%{http_code}" \
+          "https://${{ steps.extract-creds.outputs.publish_url }}/api/zipdeploy?isAsync=true" \
+          2>&1)
+        
+        HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE" | cut -d: -f2)
+        BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE/d')
+        
+        echo "HTTP Code: $HTTP_CODE"
+        echo "Response: $BODY"
+        
+        if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "202" ]; then
+          echo "❌ Error en el despliegue. HTTP Code: $HTTP_CODE"
+          exit 1
+        fi
+        
+        echo "✅ Despliegue iniciado correctamente"
 
