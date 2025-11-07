@@ -1,14 +1,11 @@
 {
-  "routes": [
-    {
-      "route": "/*",
-      "serve": "/index.html",
-      "statusCode": 200
-    }
-  ],
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/api/*", "*.{css,scss,js,jsx,mjs,png,gif,ico,jpg,svg,woff,woff2,ttf,eot,json}"]
+    "exclude": [
+      "/api/*",
+      "/*.{css,scss,js,jsx,mjs,png,gif,ico,jpg,jpeg,svg,woff,woff2,ttf,eot,json,map,webp}",
+      "/assets/*"
+    ]
   },
   "responseOverrides": {
     "404": {
@@ -23,7 +20,16 @@
     ".json": "application/json",
     ".css": "text/css",
     ".html": "text/html",
-    ".svg": "image/svg+xml"
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".ttf": "font/ttf",
+    ".eot": "application/vnd.ms-fontobject"
   },
   "globalHeaders": {
     "X-Content-Type-Options": "nosniff",
