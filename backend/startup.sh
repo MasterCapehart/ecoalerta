@@ -1,9 +1,23 @@
 #!/bin/bash
+set -e
 
 # Script de inicio para Azure App Service
 # Este script se ejecuta después de que Oryx instala las dependencias
 
 echo "🚀 Iniciando EcoAlerta Backend en Azure..."
+
+# Instalar GDAL y dependencias del sistema (requerido para Django GIS)
+echo "📦 Instalando dependencias del sistema (GDAL, GEOS, Proj)..."
+apt-get update -qq && apt-get install -y -qq \
+    libgdal-dev \
+    gdal-bin \
+    libgeos-dev \
+    libproj-dev \
+    libpq-dev \
+    python3-gdal \
+    > /dev/null 2>&1
+
+echo "✅ Dependencias del sistema instaladas"
 
 # Cambiar al directorio de la aplicación
 cd /home/site/wwwroot
@@ -15,6 +29,10 @@ if [ -d "antenv" ]; then
 else
     echo "⚠️ No se encontró entorno virtual, usando Python del sistema"
 fi
+
+# Configurar variables de entorno para GDAL/GEOS
+export GDAL_LIBRARY_PATH=/usr/lib/libgdal.so
+export GEOS_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgeos_c.so
 
 # Ejecutar migraciones
 echo "🔄 Ejecutando migraciones..."
