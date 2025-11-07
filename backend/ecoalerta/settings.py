@@ -151,6 +151,7 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',  # Vite dev server
     'http://127.0.0.1:5173',
+    'https://calm-water-08ac6120f.3.azurestaticapps.net',  # Frontend en Azure Static Web Apps
 ]
 
 # Agregar orígenes de Azure desde variables de entorno
@@ -158,6 +159,8 @@ azure_frontend_url = os.getenv('AZURE_FRONTEND_URL', '')
 if azure_frontend_url:
     CORS_ALLOWED_ORIGINS.append(azure_frontend_url)
 
+# Permitir todos los orígenes de Azure Static Web Apps (temporal para debugging)
+CORS_ALLOW_ALL_ORIGINS = False  # Mantener False para seguridad
 CORS_ALLOW_CREDENTIALS = True
 
 # WhiteNoise configuration para servir archivos estáticos
