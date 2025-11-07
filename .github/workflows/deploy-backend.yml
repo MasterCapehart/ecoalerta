@@ -37,11 +37,14 @@ jobs:
         cd backend
         # Asegurar que startup.sh tenga permisos de ejecución
         chmod +x startup.sh
-        # Verificar que el archivo existe
+        # Verificar que el archivo existe y está en la raíz
         ls -la startup.sh
         echo ""
         echo "=== Contenido de startup.sh ==="
         cat startup.sh
+        echo ""
+        echo "=== Verificando estructura del directorio ==="
+        ls -la | head -10
     
     - name: Desplegar a Azure App Service
       uses: azure/webapps-deploy@v3
