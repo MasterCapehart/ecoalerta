@@ -38,6 +38,10 @@ jobs:
         echo ""
         echo "=== Verificar startup.sh ==="
         ls -la backend/startup.sh || echo "startup.sh no encontrado"
+        echo ""
+        echo "=== Verificar permisos de startup.sh ==="
+        chmod +x backend/startup.sh
+        ls -la backend/startup.sh
     
     - name: Desplegar a Azure App Service
       uses: azure/webapps-deploy@v3
