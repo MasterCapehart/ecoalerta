@@ -50,22 +50,6 @@ jobs:
         pwd
         test -f startup.sh && echo "✅ startup.sh encontrado en $(pwd)" || echo "❌ startup.sh NO encontrado"
     
-    - name: Instalar Azure CLI
-      run: |
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-    
-    - name: Login a Azure usando publish profile
-      run: |
-        # Extraer credenciales del publish profile
-        echo "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" > /tmp/publish-profile.xml
-        USERNAME=$(grep -oP 'userName="\K[^"]+' /tmp/publish-profile.xml | head -1)
-        PASSWORD=$(grep -oP 'userPWD="\K[^"]+' /tmp/publish-profile.xml | head -1)
-        PUBLISH_URL=$(grep -oP 'publishUrl="\K[^"]+' /tmp/publish-profile.xml | grep "scm" | head -1 | sed 's/:443//')
-        
-        # Login usando credenciales básicas
-        az login --service-principal -u "$USERNAME" -p "$PASSWORD" --tenant $(az account show --query tenantId -o tsv) || \
-        az webapp deployment list-publishing-credentials --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group ecoalerta1
-    
     - name: Crear ZIP para despliegue
       run: |
         cd backend
@@ -73,10 +57,23 @@ jobs:
         cd ..
         ls -lh backend-deploy.zip
     
-    - name: Desplegar usando Azure CLI ZIP Deploy
+    - name: Extraer credenciales del publish profile
+      id: extract-creds
       run: |
-        az webapp deployment source config-zip \
-          --resource-group ecoalerta1 \
-          --name ${{ env.AZURE_WEBAPP_NAME }} \
-          --src backend-deploy.zip
+        echo "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" > /tmp/publish-profile.xml
+        USERNAME=$(grep -oP 'userName="\K[^"]+' /tmp/publish-profile.xml | head -1)
+        PASSWORD=$(grep -oP 'userPWD="\K[^"]+' /tmp/publish-profile.xml | head -1)
+        PUBLISH_URL=$(grep -oP 'publishUrl="\K[^"]+' /tmp/publish-profile.xml | grep "scm" | head -1)
+        echo "username=$USERNAME" >> $GITHUB_OUTPUT
+        echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+        echo "publish_url=$PUBLISH_URL" >> $GITHUB_OUTPUT
+        echo "✅ Credenciales extraídas"
+    
+    - name: Desplegar usando ZIP Deploy API
+      run: |
+        curl -X POST \
+          -u "${{ steps.extract-creds.outputs.username }}:${{ steps.extract-creds.outputs.password }}" \
+          --data-binary @backend-deploy.zip \
+          -H "Content-Type: application/zip" \
+          "https://${{ steps.extract-creds.outputs.publish_url }}/api/zipdeploy?isAsync=true"
 
