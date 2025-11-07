@@ -28,6 +28,8 @@ jobs:
           cd frontend
           npm ci
           npm run build
+          # Copiar staticwebapp.config.json al directorio dist
+          cp staticwebapp.config.json dist/ || echo "staticwebapp.config.json no encontrado, continuando..."
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
       - name: Build And Deploy
