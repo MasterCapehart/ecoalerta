@@ -185,6 +185,10 @@ SECURE_SSL_REDIRECT = False
 # Azure usa un proxy inverso, necesitamos indicarle a Django que confíe en los headers del proxy
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# Desactivar APPEND_SLASH para evitar redirecciones automáticas
+# Esto evita que CommonMiddleware intente agregar una barra final a las URLs
+APPEND_SLASH = False
+
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
