@@ -43,8 +43,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # WhiteNoise debe ir después de SecurityMiddleware
+    # SecurityMiddleware desactivado temporalmente para evitar redirecciones 301
+    # 'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     # CommonMiddleware desactivado temporalmente para evitar redirecciones
     # 'django.middleware.common.CommonMiddleware',
