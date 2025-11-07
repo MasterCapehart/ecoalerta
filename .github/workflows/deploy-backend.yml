@@ -57,16 +57,6 @@ jobs:
         cd ..
         ls -lh backend-deploy.zip
     
-    - name: Instalar Azure CLI
-      run: |
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-    
-    - name: Login a Azure
-      uses: azure/login@v2
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-      continue-on-error: true
-    
     - name: Desplegar usando credenciales de usuario
       run: |
         USERNAME="${{ secrets.AZURE_DEPLOY_USERNAME }}"
