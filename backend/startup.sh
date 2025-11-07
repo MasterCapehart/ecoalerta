@@ -8,16 +8,19 @@ echo "🚀 Iniciando EcoAlerta Backend en Azure..."
 
 # Instalar GDAL y dependencias del sistema (requerido para Django GIS)
 echo "📦 Instalando dependencias del sistema (GDAL, GEOS, Proj)..."
-apt-get update -qq && apt-get install -y -qq \
+if apt-get update -qq && apt-get install -y -qq \
     libgdal-dev \
     gdal-bin \
     libgeos-dev \
     libproj-dev \
     libpq-dev \
     python3-gdal \
-    > /dev/null 2>&1
-
-echo "✅ Dependencias del sistema instaladas"
+    > /dev/null 2>&1; then
+    echo "✅ Dependencias del sistema instaladas"
+else
+    echo "⚠️ No se pudieron instalar dependencias del sistema (puede requerir permisos root)"
+    echo "Intentando continuar..."
+fi
 
 # Cambiar al directorio de la aplicación
 cd /home/site/wwwroot
