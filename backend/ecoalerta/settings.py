@@ -42,8 +42,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'ecoalerta.middleware.PreventRedirectsMiddleware',  # Prevenir redirecciones en API (PRIMERO)
     'django.middleware.security.SecurityMiddleware',
+    'ecoalerta.middleware.PreventRedirectsMiddleware',  # Interceptar redirecciones DESPUÉS de SecurityMiddleware
     'corsheaders.middleware.CorsMiddleware',
     'ecoalerta.middleware.DisableCSRFForAPI',  # Desactivar CSRF para API
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -223,16 +223,22 @@ elif platform.system() == 'Linux':  # Azure Linux
 # NO redirigir a HTTPS porque Azure ya lo maneja y puede causar bucles
 SECURE_SSL_REDIRECT = False
 
-# Configuración de proxy headers para Azure App Service
-# Azure usa un proxy inverso, necesitamos indicarle a Django que confíe en los headers del proxy
-USE_X_FORWARDED_HOST = True
-USE_X_FORWARDED_PORT = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
-# Configuración de HSTS (solo si es necesario, desactivado por defecto)
+# IMPORTANTE: Desactivar todas las redirecciones relacionadas con SSL/HTTPS
+# Azure App Service ya maneja HTTPS, no necesitamos que Django redirija
 SECURE_HSTS_SECONDS = 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
+
+# Configuración de proxy headers para Azure App Service
+# Azure usa un proxy inverso, pero NO confiar en los headers para evitar redirecciones
+# Comentado temporalmente para evitar bucles de redirección
+# USE_X_FORWARDED_HOST = True
+# USE_X_FORWARDED_PORT = True
+# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Desactivar completamente las redirecciones de seguridad
+# Esto evita que SecurityMiddleware redirija requests
+FORCE_SCRIPT_NAME = None
 
 # APPEND_SLASH desactivado para evitar redirecciones en API
 # Las URLs de API deben manejarse explícitamente sin redirecciones
