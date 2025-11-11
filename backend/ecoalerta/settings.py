@@ -42,14 +42,14 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
-    # SecurityMiddleware desactivado temporalmente para evitar redirecciones 301
-    # 'django.middleware.security.SecurityMiddleware',
+    'ecoalerta.middleware.DisableCSRFForAPI',  # Desactivar CSRF para API
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    # CommonMiddleware desactivado temporalmente para evitar redirecciones
-    # 'django.middleware.common.CommonMiddleware',
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'ecoalerta.middleware.PreventRedirectsMiddleware',  # Prevenir redirecciones en API
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -147,6 +147,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    # Desactivar autenticación por defecto para API pública
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
 }
 
 # CORS settings
@@ -165,6 +175,33 @@ if azure_frontend_url:
 CORS_ALLOW_ALL_ORIGINS = False  # Mantener False para seguridad
 CORS_ALLOW_CREDENTIALS = True
 
+# Configuración adicional de CORS para evitar problemas
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# Desactivar CSRF para API endpoints (Django REST Framework maneja esto)
+CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
+if azure_frontend_url:
+    CSRF_TRUSTED_ORIGINS.append(azure_frontend_url)
+
 # WhiteNoise configuration para servir archivos estáticos
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
@@ -182,22 +219,29 @@ elif platform.system() == 'Linux':  # Azure Linux
     GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH', '/usr/lib/libgeos_c.so')
 
 # Configuración de seguridad para producción
-# Azure App Service ya maneja HTTPS, no necesitamos redirigir
-# IMPORTANTE: Siempre desactivar SECURE_SSL_REDIRECT para evitar bucles de redirección
+# Azure App Service maneja HTTPS a través de un proxy inverso
+# NO redirigir a HTTPS porque Azure ya lo maneja y puede causar bucles
 SECURE_SSL_REDIRECT = False
 
-# Desactivar todas las redirecciones relacionadas con seguridad
+# Configuración de proxy headers para Azure App Service
+# Azure usa un proxy inverso, necesitamos indicarle a Django que confíe en los headers del proxy
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Configuración de HSTS (solo si es necesario, desactivado por defecto)
 SECURE_HSTS_SECONDS = 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
 
-# Configuración de proxy headers para Azure App Service
-# Azure usa un proxy inverso, necesitamos indicarle a Django que confíe en los headers del proxy
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# APPEND_SLASH debe estar en True para que CommonMiddleware maneje correctamente las URLs
+# Esto asegura que las URLs sin barra final se manejen correctamente
+APPEND_SLASH = True
 
-# Desactivar APPEND_SLASH para evitar redirecciones automáticas
-# Esto evita que CommonMiddleware intente agregar una barra final a las URLs
-APPEND_SLASH = False
+# Desactivar redirecciones automáticas para evitar problemas en Azure
+# Esto evita que CommonMiddleware redirija requests que no tienen barra final
+# Pero mantenemos APPEND_SLASH=True para que Django maneje correctamente las URLs
+PREPEND_WWW = False
 
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
