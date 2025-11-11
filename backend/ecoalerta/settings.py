@@ -42,6 +42,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'ecoalerta.middleware.PreventRedirectsMiddleware',  # Prevenir redirecciones en API (PRIMERO)
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'ecoalerta.middleware.DisableCSRFForAPI',  # Desactivar CSRF para API
@@ -49,7 +50,6 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'ecoalerta.middleware.PreventRedirectsMiddleware',  # Prevenir redirecciones en API
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -234,13 +234,11 @@ SECURE_HSTS_SECONDS = 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
 
-# APPEND_SLASH debe estar en True para que CommonMiddleware maneje correctamente las URLs
-# Esto asegura que las URLs sin barra final se manejen correctamente
-APPEND_SLASH = True
+# APPEND_SLASH desactivado para evitar redirecciones en API
+# Las URLs de API deben manejarse explícitamente sin redirecciones
+APPEND_SLASH = False
 
 # Desactivar redirecciones automáticas para evitar problemas en Azure
-# Esto evita que CommonMiddleware redirija requests que no tienen barra final
-# Pero mantenemos APPEND_SLASH=True para que Django maneje correctamente las URLs
 PREPEND_WWW = False
 
 if not DEBUG:
