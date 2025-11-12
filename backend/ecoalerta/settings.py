@@ -42,7 +42,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
+    # SecurityMiddleware DESACTIVADO completamente - está causando bucles de redirección
+    # 'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'ecoalerta.middleware.DisableCSRFForAPI',  # Desactivar CSRF para API
     'whitenoise.middleware.WhiteNoiseMiddleware',
