@@ -49,7 +49,8 @@ MIDDLEWARE = [
     'ecoalerta.middleware.DisableCSRFForAPI',  # Desactivar CSRF para API
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
+    # CommonMiddleware DESACTIVADO temporalmente - puede estar causando redirecciones
+    # 'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
