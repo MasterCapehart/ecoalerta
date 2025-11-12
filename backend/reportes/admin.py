@@ -14,7 +14,7 @@ class ReporteAdmin(admin.ModelAdmin):
             'fields': ('codigo_seguimiento', 'categoria', 'descripcion', 'foto', 'email')
         }),
         ('Ubicación', {
-            'fields': ('ubicacion', 'direccion')
+            'fields': ('ubicacion_lat', 'ubicacion_lng', 'direccion')
         }),
         ('Estado y Seguimiento', {
             'fields': ('estado', 'notas_internas', 'asignado_a')

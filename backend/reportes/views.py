@@ -5,21 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate
 from django.db.models import Count, Q
-# Intentar importar funciones de GeoDjango, si no están disponibles, usar alternativas
-try:
-    from django.contrib.gis.db.models.functions import AsGeoJSON
-    from django.contrib.gis.geos import Point as GeoPoint
-    USE_GEODJANGO = True
-except (ImportError, OSError):
-    USE_GEODJANGO = False
-    # Sin GeoDjango, crear funciones alternativas
-    def AsGeoJSON(*args, **kwargs):
-        return None
-    class GeoPoint:
-        def __init__(self, lng, lat):
-            self.x = lng
-            self.y = lat
-
+# NO usar GeoDjango - causa errores con GDAL en Azure
 from django.db import connection
 
 from .models import Reporte, CategoriaResiduo, Usuario

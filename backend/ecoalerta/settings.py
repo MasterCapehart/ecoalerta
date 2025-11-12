@@ -36,24 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 ]
 
-# Intentar agregar django.contrib.gis solo si GDAL está disponible
-try:
-    import os
-    # Verificar si GDAL está disponible antes de agregar django.contrib.gis
-    if os.getenv('ENABLE_GDAL', 'true').lower() == 'true':
-        # Intentar importar GDAL para verificar si está disponible
-        try:
-            from django.contrib.gis import gdal
-            INSTALLED_APPS.append('django.contrib.gis')
-            print("✅ django.contrib.gis habilitado")
-        except Exception as e:
-            print(f"⚠️ GDAL no disponible, deshabilitando django.contrib.gis: {e}")
-            # Sin GDAL, no podemos usar PostGIS, pero Django puede iniciar
-    else:
-        print("⚠️ GDAL deshabilitado por configuración")
-except Exception as e:
-    print(f"⚠️ Error verificando GDAL: {e}")
-
+# NO usar django.contrib.gis - causa errores con GDAL en Azure
 # Agregar el resto de las apps
 INSTALLED_APPS.extend([
     'rest_framework',
@@ -232,51 +215,8 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Custom user model
 AUTH_USER_MODEL = 'reportes.Usuario'
 
-# GDAL Configuration for PostGIS
-# Configurar GDAL/GEOS solo si están disponibles, de lo contrario usar valores por defecto
-import platform
-try:
-    if platform.system() == 'Darwin':  # macOS
-        GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH', '/opt/homebrew/lib/libgdal.dylib')
-        GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH', '/opt/homebrew/lib/libgeos_c.dylib')
-    elif platform.system() == 'Linux':  # Azure Linux
-        # Azure App Service - intentar múltiples rutas comunes
-        GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH')
-        GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH')
-        
-        # Si no está configurado, intentar encontrar la librería
-        if not GDAL_LIBRARY_PATH:
-            import os.path
-            possible_gdal_paths = [
-                '/usr/lib/libgdal.so',
-                '/usr/lib/x86_64-linux-gnu/libgdal.so',
-                '/usr/lib/x86_64-linux-gnu/libgdal.so.32',
-                '/usr/lib/x86_64-linux-gnu/libgdal.so.33',
-            ]
-            for path in possible_gdal_paths:
-                if os.path.exists(path):
-                    GDAL_LIBRARY_PATH = path
-                    break
-        
-        if not GEOS_LIBRARY_PATH:
-            import os.path
-            possible_geos_paths = [
-                '/usr/lib/libgeos_c.so',
-                '/usr/lib/x86_64-linux-gnu/libgeos_c.so',
-                '/usr/lib/x86_64-linux-gnu/libgeos_c.so.1',
-            ]
-            for path in possible_geos_paths:
-                if os.path.exists(path):
-                    GEOS_LIBRARY_PATH = path
-                    break
-except Exception as e:
-    # Si hay algún error al configurar GDAL/GEOS, usar valores por defecto
-    # Esto permite que Django inicie incluso si GDAL no está disponible
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.warning(f"No se pudo configurar GDAL/GEOS: {e}")
-    GDAL_LIBRARY_PATH = None
-    GEOS_LIBRARY_PATH = None
+# GDAL/GEOS NO configurado - no usar PostGIS por ahora
+# Se eliminó toda configuración de GDAL para evitar errores de importación
 
 # Configuración de seguridad para producción
 # Azure App Service maneja HTTPS a través de un proxy inverso
