@@ -51,12 +51,14 @@ class ReporteSerializer(serializers.ModelSerializer):
         return None
     
     def create(self, validated_data):
-        # Extraer lat y lng del contexto y crear Point
+        # Extraer lat y lng del contexto y guardar directamente en campos
         lat = self.context['request'].data.get('lat')
         lng = self.context['request'].data.get('lng')
         
-        if lat and lng:
-            validated_data['ubicacion'] = Point(float(lng), float(lat))
+        # Guardar lat y lng directamente en los campos
+        if lat is not None and lng is not None:
+            validated_data['ubicacion_lat'] = float(lat)
+            validated_data['ubicacion_lng'] = float(lng)
         
         return super().create(validated_data)
 

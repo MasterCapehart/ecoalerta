@@ -1,5 +1,6 @@
-# Models con PostGIS para Azure PostgreSQL
-from django.contrib.gis.db import models
+# Models - Usando modelos estándar (sin PostGIS por ahora)
+# TODO: Migrar a PostGIS cuando GDAL esté instalado correctamente en Azure
+from django.db import models
 from django.contrib.auth.models import AbstractUser
 import secrets
 import string
