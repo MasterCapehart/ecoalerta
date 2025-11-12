@@ -211,14 +211,41 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 AUTH_USER_MODEL = 'reportes.Usuario'
 
 # GDAL Configuration for PostGIS
+# Intentar múltiples rutas para GDAL/GEOS en Azure
 import platform
 if platform.system() == 'Darwin':  # macOS
     GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH', '/opt/homebrew/lib/libgdal.dylib')
     GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH', '/opt/homebrew/lib/libgeos_c.dylib')
 elif platform.system() == 'Linux':  # Azure Linux
-    # Azure App Service usa estas rutas por defecto
-    GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH', '/usr/lib/libgdal.so')
-    GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH', '/usr/lib/libgeos_c.so')
+    # Azure App Service - intentar múltiples rutas comunes
+    GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH')
+    GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH')
+    
+    # Si no está configurado, intentar encontrar la librería
+    if not GDAL_LIBRARY_PATH:
+        import os.path
+        possible_gdal_paths = [
+            '/usr/lib/libgdal.so',
+            '/usr/lib/x86_64-linux-gnu/libgdal.so',
+            '/usr/lib/x86_64-linux-gnu/libgdal.so.32',
+            '/usr/lib/x86_64-linux-gnu/libgdal.so.33',
+        ]
+        for path in possible_gdal_paths:
+            if os.path.exists(path):
+                GDAL_LIBRARY_PATH = path
+                break
+    
+    if not GEOS_LIBRARY_PATH:
+        import os.path
+        possible_geos_paths = [
+            '/usr/lib/libgeos_c.so',
+            '/usr/lib/x86_64-linux-gnu/libgeos_c.so',
+            '/usr/lib/x86_64-linux-gnu/libgeos_c.so.1',
+        ]
+        for path in possible_geos_paths:
+            if os.path.exists(path):
+                GEOS_LIBRARY_PATH = path
+                break
 
 # Configuración de seguridad para producción
 # Azure App Service maneja HTTPS a través de un proxy inverso
