@@ -34,12 +34,33 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.gis',  # PostGIS support - habilitado para Azure PostgreSQL
+]
+
+# Intentar agregar django.contrib.gis solo si GDAL está disponible
+try:
+    import os
+    # Verificar si GDAL está disponible antes de agregar django.contrib.gis
+    if os.getenv('ENABLE_GDAL', 'true').lower() == 'true':
+        # Intentar importar GDAL para verificar si está disponible
+        try:
+            from django.contrib.gis import gdal
+            INSTALLED_APPS.append('django.contrib.gis')
+            print("✅ django.contrib.gis habilitado")
+        except Exception as e:
+            print(f"⚠️ GDAL no disponible, deshabilitando django.contrib.gis: {e}")
+            # Sin GDAL, no podemos usar PostGIS, pero Django puede iniciar
+    else:
+        print("⚠️ GDAL deshabilitado por configuración")
+except Exception as e:
+    print(f"⚠️ Error verificando GDAL: {e}")
+
+# Agregar el resto de las apps
+INSTALLED_APPS.extend([
     'rest_framework',
     'corsheaders',  # CORS support
     'whitenoise.runserver_nostatic',  # WhiteNoise para servir archivos estáticos
     'reportes',
-]
+])
 
 MIDDLEWARE = [
     # SecurityMiddleware DESACTIVADO completamente - está causando bucles de redirección

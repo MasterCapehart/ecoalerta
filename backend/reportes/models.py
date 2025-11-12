@@ -75,8 +75,25 @@ class Reporte(models.Model):
     )
     
     # Ubicación geográfica (PostGIS)
-    ubicacion = models.PointField(srid=4326, null=True, blank=True)  # WGS84
-    direccion = models.CharField(max_length=255, blank=True)
+    # Usar PointField si GeoDjango está disponible, sino usar campos separados
+    if USE_GEODJANGO:
+        ubicacion = gis_models.PointField(srid=4326, null=True, blank=True)  # WGS84
+    else:
+        # Sin GeoDjango, usar campos de latitud y longitud
+        ubicacion_lat = gis_models.FloatField(null=True, blank=True)
+        ubicacion_lng = gis_models.FloatField(null=True, blank=True)
+        # Propiedad para compatibilidad
+        @property
+        def ubicacion(self):
+            if self.ubicacion_lat and self.ubicacion_lng:
+                # Retornar un objeto que simule un Point
+                class FakePoint:
+                    def __init__(self, lat, lng):
+                        self.y = lat
+                        self.x = lng
+                return FakePoint(self.ubicacion_lat, self.ubicacion_lng)
+            return None
+    direccion = gis_models.CharField(max_length=255, blank=True)
     
     # Estado y seguimiento
     estado = models.CharField(

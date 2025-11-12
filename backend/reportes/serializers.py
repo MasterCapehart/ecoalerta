@@ -1,5 +1,15 @@
 from rest_framework import serializers
-from django.contrib.gis.geos import Point
+# Intentar importar Point de GeoDjango, si no está disponible, usar alternativa
+try:
+    from django.contrib.gis.geos import Point
+    USE_GEODJANGO = True
+except ImportError:
+    USE_GEODJANGO = False
+    # Sin GeoDjango, crear una clase Point simple
+    class Point:
+        def __init__(self, lng, lat):
+            self.x = lng
+            self.y = lat
 from .models import Reporte, CategoriaResiduo, Usuario, Notificacion
 
 
