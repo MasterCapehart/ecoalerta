@@ -42,8 +42,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'ecoalerta.middleware.PreventRedirectsMiddleware',  # Interceptar redirecciones DESPUÉS de SecurityMiddleware
+    # SecurityMiddleware DESACTIVADO temporalmente para diagnosticar problema de redirecciones
+    # 'django.middleware.security.SecurityMiddleware',
+    'ecoalerta.middleware.PreventRedirectsMiddleware',  # Interceptar redirecciones
     'corsheaders.middleware.CorsMiddleware',
     'ecoalerta.middleware.DisableCSRFForAPI',  # Desactivar CSRF para API
     'whitenoise.middleware.WhiteNoiseMiddleware',
