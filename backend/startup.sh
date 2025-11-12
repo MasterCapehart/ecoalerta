@@ -13,13 +13,19 @@ cd /home/site/wwwroot || {
 echo "Directorio: $(pwd)"
 echo "Contenido: $(ls -la | head -10)"
 
-# Instalar libpq-dev si no está disponible (para PostgreSQL)
-echo "Verificando libpq-dev..."
+# Instalar dependencias del sistema
+echo "Instalando dependencias del sistema..."
+apt-get update -qq 2>&1 | head -5
+
+# Instalar libpq-dev para PostgreSQL
 if ! dpkg -l | grep -q "^ii.*libpq-dev"; then
     echo "Instalando libpq-dev..."
-    apt-get update -qq 2>&1 | head -5
     apt-get install -y -qq libpq-dev 2>&1 | head -5 || echo "⚠️ No se pudo instalar libpq-dev (continuando)"
 fi
+
+# Instalar GDAL/GEOS para evitar errores si Django intenta usar PostGIS
+echo "Instalando GDAL/GEOS (por si acaso Django intenta usarlos)..."
+apt-get install -y -qq gdal-bin libgdal-dev libgeos-dev libproj-dev 2>&1 | head -5 || echo "⚠️ No se pudo instalar GDAL/GEOS (continuando)"
 
 # Crear o activar entorno virtual
 if [ ! -d "antenv" ]; then

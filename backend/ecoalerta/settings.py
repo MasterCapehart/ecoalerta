@@ -85,17 +85,12 @@ WSGI_APPLICATION = 'ecoalerta.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Azure PostgreSQL - Usando PostgreSQL estándar (sin PostGIS por ahora)
-# TODO: Migrar a PostGIS cuando GDAL esté instalado correctamente
-# IMPORTANTE: Forzar ENGINE explícitamente - NO usar PostGIS aunque la BD lo tenga
-DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.postgresql')
-# Asegurar que NUNCA use PostGIS
-if 'postgis' in DB_ENGINE.lower() or 'gis' in DB_ENGINE.lower():
-    DB_ENGINE = 'django.db.backends.postgresql'
-
+# Azure PostgreSQL - Usando PostgreSQL estándar (NO PostGIS)
+# IMPORTANTE: Forzar ENGINE explícitamente como PostgreSQL estándar
+# Aunque instalamos GDAL/GEOS, NO usamos PostGIS para evitar problemas
 DATABASES = {
     'default': {
-        'ENGINE': DB_ENGINE,  # Forzar PostgreSQL estándar
+        'ENGINE': 'django.db.backends.postgresql',  # PostgreSQL estándar, NO PostGIS
         'NAME': os.getenv('DB_NAME', 'postgres'),
         'USER': os.getenv('DB_USER', 'administrador'),
         'PASSWORD': os.getenv('DB_PASSWORD', 'Ecoalerta1'),
@@ -107,9 +102,12 @@ DATABASES = {
     }
 }
 
-# Verificar que el ENGINE sea correcto
-if 'postgis' in DATABASES['default']['ENGINE'].lower() or 'gis' in DATABASES['default']['ENGINE'].lower():
-    raise ValueError(f"ERROR: ENGINE no puede ser PostGIS: {DATABASES['default']['ENGINE']}")
+# Validar que el ENGINE sea correcto (forzar PostgreSQL estándar)
+if DATABASES['default']['ENGINE'] != 'django.db.backends.postgresql':
+    # Si por alguna razón el ENGINE no es PostgreSQL estándar, forzarlo
+    print(f"⚠️ ADVERTENCIA: ENGINE no es PostgreSQL estándar: {DATABASES['default']['ENGINE']}")
+    print("   Forzando a django.db.backends.postgresql")
+    DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
 
 
 # Password validation
