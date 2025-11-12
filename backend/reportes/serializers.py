@@ -35,12 +35,18 @@ class ReporteSerializer(serializers.ModelSerializer):
         read_only_fields = ['codigo_seguimiento', 'fecha_creacion', 'fecha_actualizacion']
     
     def get_lat(self, obj):
-        if obj.ubicacion:
+        # Usar ubicacion_lat directamente o ubicacion si está disponible
+        if hasattr(obj, 'ubicacion_lat') and obj.ubicacion_lat is not None:
+            return obj.ubicacion_lat
+        elif obj.ubicacion:
             return obj.ubicacion.y
         return None
     
     def get_lng(self, obj):
-        if obj.ubicacion:
+        # Usar ubicacion_lng directamente o ubicacion si está disponible
+        if hasattr(obj, 'ubicacion_lng') and obj.ubicacion_lng is not None:
+            return obj.ubicacion_lng
+        elif obj.ubicacion:
             return obj.ubicacion.x
         return None
     

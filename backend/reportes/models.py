@@ -74,26 +74,36 @@ class Reporte(models.Model):
         null=True
     )
     
-    # Ubicación geográfica (PostGIS)
-    # Usar PointField si GeoDjango está disponible, sino usar campos separados
-    if USE_GEODJANGO:
-        ubicacion = gis_models.PointField(srid=4326, null=True, blank=True)  # WGS84
-    else:
-        # Sin GeoDjango, usar campos de latitud y longitud
-        ubicacion_lat = gis_models.FloatField(null=True, blank=True)
-        ubicacion_lng = gis_models.FloatField(null=True, blank=True)
-        # Propiedad para compatibilidad
-        @property
-        def ubicacion(self):
-            if self.ubicacion_lat and self.ubicacion_lng:
-                # Retornar un objeto que simule un Point
-                class FakePoint:
-                    def __init__(self, lat, lng):
-                        self.y = lat
-                        self.x = lng
-                return FakePoint(self.ubicacion_lat, self.ubicacion_lng)
-            return None
-    direccion = gis_models.CharField(max_length=255, blank=True)
+    # Ubicación geográfica
+    # Usar campos de latitud y longitud temporalmente (sin PostGIS)
+    # TODO: Migrar a PointField cuando GDAL esté instalado correctamente
+    ubicacion_lat = models.FloatField(null=True, blank=True, db_index=True)
+    ubicacion_lng = models.FloatField(null=True, blank=True, db_index=True)
+    direccion = models.CharField(max_length=255, blank=True)
+    
+    # Propiedad para compatibilidad con código que espera ubicacion como Point
+    @property
+    def ubicacion(self):
+        if self.ubicacion_lat is not None and self.ubicacion_lng is not None:
+            # Retornar un objeto que simule un Point
+            class FakePoint:
+                def __init__(self, lat, lng):
+                    self.y = lat
+                    self.x = lng
+                def __bool__(self):
+                    return True
+            return FakePoint(self.ubicacion_lat, self.ubicacion_lng)
+        return None
+    
+    @ubicacion.setter
+    def ubicacion(self, value):
+        # Permitir asignar un Point o None
+        if value is None:
+            self.ubicacion_lat = None
+            self.ubicacion_lng = None
+        elif hasattr(value, 'y') and hasattr(value, 'x'):
+            self.ubicacion_lat = value.y
+            self.ubicacion_lng = value.x
     
     # Estado y seguimiento
     estado = models.CharField(

@@ -102,10 +102,11 @@ WSGI_APPLICATION = 'ecoalerta.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Azure PostgreSQL con PostGIS
+# Azure PostgreSQL - Usando PostgreSQL estándar (sin PostGIS por ahora)
+# TODO: Migrar a PostGIS cuando GDAL esté instalado correctamente
 DATABASES = {
     'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('DB_NAME', 'postgres'),
         'USER': os.getenv('DB_USER', 'administrador'),
         'PASSWORD': os.getenv('DB_PASSWORD', 'Ecoalerta1'),

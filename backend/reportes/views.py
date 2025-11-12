@@ -5,8 +5,21 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate
 from django.db.models import Count, Q
-from django.contrib.gis.db.models.functions import AsGeoJSON
-from django.contrib.gis.geos import Point
+# Intentar importar funciones de GeoDjango, si no están disponibles, usar alternativas
+try:
+    from django.contrib.gis.db.models.functions import AsGeoJSON
+    from django.contrib.gis.geos import Point as GeoPoint
+    USE_GEODJANGO = True
+except (ImportError, OSError):
+    USE_GEODJANGO = False
+    # Sin GeoDjango, crear funciones alternativas
+    def AsGeoJSON(*args, **kwargs):
+        return None
+    class GeoPoint:
+        def __init__(self, lng, lat):
+            self.x = lng
+            self.y = lat
+
 from django.db import connection
 
 from .models import Reporte, CategoriaResiduo, Usuario
@@ -169,7 +182,7 @@ def login_view(request):
 def heatmap_view(request):
     """
     Endpoint para obtener datos de densidad de reportes para el mapa de calor.
-    Calcula la densidad usando una cuadrícula espacial con PostGIS.
+    Versión simplificada sin PostGIS - agrupa reportes por cuadrícula aproximada.
     """
     # Parámetros opcionales
     radio = float(request.query_params.get('radio', 0.01))  # Radio en grados (~1km)
@@ -179,52 +192,50 @@ def heatmap_view(request):
     estado = request.query_params.get('estado')
     categoria_id = request.query_params.get('categoria')
     
-    # Usar SQL raw para calcular densidad espacial
-    # Agrupamos reportes por proximidad usando ST_SnapToGrid
-    with connection.cursor() as cursor:
-        # Usamos ST_SnapToGrid para crear una cuadrícula y contar reportes por celda
-        # El tamaño de la celda se ajusta según el radio
-        grid_size = radio * 2  # Tamaño de celda en grados
-        
-        query = """
-        SELECT 
-            ST_X(ST_Centroid(ST_Collect(ubicacion))) as lng,
-            ST_Y(ST_Centroid(ST_Collect(ubicacion))) as lat,
-            COUNT(*) as densidad
-        FROM reportes_reporte
-        WHERE ubicacion IS NOT NULL
-        """
-        
-        params = []
-        if estado:
-            query += " AND estado = %s"
-            params.append(estado)
-        
-        if categoria_id:
-            query += " AND categoria_id = %s"
-            params.append(categoria_id)
-        
-        query += """
-        GROUP BY 
-            ST_SnapToGrid(ubicacion, %s)
-        HAVING COUNT(*) >= %s
-        ORDER BY densidad DESC
-        """
-        params.extend([grid_size, min_densidad])
-        
-        cursor.execute(query, params)
-        results = cursor.fetchall()
+    # Query simplificada sin PostGIS - agrupar por cuadrícula aproximada
+    queryset = Reporte.objects.filter(
+        ubicacion_lat__isnull=False,
+        ubicacion_lng__isnull=False
+    )
     
-    # Formatear resultados para el heatmap
-    heatmap_data = []
-    for row in results:
-        lng, lat, densidad = row
-        heatmap_data.append({
-            'lat': float(lat),
-            'lng': float(lng),
-            'intensity': densidad,  # Intensidad basada en cantidad de reportes
-            'densidad': densidad
-        })
+    if estado:
+        queryset = queryset.filter(estado=estado)
+    if categoria_id:
+        queryset = queryset.filter(categoria_id=categoria_id)
+    
+    # Agrupar manualmente por cuadrícula (aproximación)
+    grid_size = radio * 2
+    heatmap_dict = {}
+    
+    for reporte in queryset:
+        if reporte.ubicacion_lat and reporte.ubicacion_lng:
+            # Redondear a la cuadrícula
+            grid_lat = round(reporte.ubicacion_lat / grid_size) * grid_size
+            grid_lng = round(reporte.ubicacion_lng / grid_size) * grid_size
+            key = (grid_lat, grid_lng)
+            
+            if key not in heatmap_dict:
+                heatmap_dict[key] = {
+                    'lat': grid_lat,
+                    'lng': grid_lng,
+                    'densidad': 0
+                }
+            heatmap_dict[key]['densidad'] += 1
+    
+    # Filtrar por densidad mínima y formatear
+    heatmap_data = [
+        {
+            'lat': item['lat'],
+            'lng': item['lng'],
+            'intensity': item['densidad'],
+            'densidad': item['densidad']
+        }
+        for item in heatmap_dict.values()
+        if item['densidad'] >= min_densidad
+    ]
+    
+    # Ordenar por densidad
+    heatmap_data.sort(key=lambda x: x['densidad'], reverse=True)
     
     return Response({
         'data': heatmap_data,
