@@ -4,6 +4,7 @@ URL configuration for ecoalerta project.
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse, HttpResponse
+from django.views.decorators.http import require_http_methods
 
 def root_view(request):
     """Vista raíz para evitar bucles de redirección"""
@@ -19,6 +20,8 @@ def root_view(request):
     })
     # Asegurar que no haya redirecciones
     response.status_code = 200
+    # Forzar headers para evitar cualquier redirección
+    response['Location'] = None
     return response
 
 urlpatterns = [

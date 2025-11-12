@@ -35,33 +35,28 @@ jobs:
       run: |
         echo "=== Preparando archivos para despliegue ==="
         cd backend
-        # Asegurar que startup.sh tenga permisos de ejecución
-        chmod +x startup.sh
-        # Verificar que el archivo existe y está en la raíz
-        ls -la startup.sh
-        echo ""
-        echo "=== Contenido de startup.sh ==="
-        cat startup.sh
-        echo ""
+        # Asegurar que los scripts tengan permisos de ejecución
+        chmod +x startup.sh build.sh || true
         echo "=== Verificando estructura del directorio ==="
-        ls -la | head -10
-        echo ""
-        echo "=== Verificando que startup.sh esté en la raíz ==="
-        pwd
-        test -f startup.sh && echo "✅ startup.sh encontrado en $(pwd)" || echo "❌ startup.sh NO encontrado"
+        ls -la | head -15
         cd ..
     
     - name: Crear ZIP para despliegue (con estructura correcta para Oryx)
       run: |
         echo "=== Creando ZIP para despliegue ==="
         cd backend
+        # Verificar que los archivos críticos existen
+        echo "=== Verificando archivos críticos ==="
+        ls -la manage.py requirements.txt ecoalerta/settings.py ecoalerta/middleware.py || echo "⚠️ Algunos archivos no encontrados"
         # Crear ZIP incluyendo todo lo necesario para que Oryx construya
         zip -r ../backend-deploy.zip . \
-          -x "*.git*" "*.pyc" "__pycache__/*" "*.log" "venv/*" ".venv/*" "*.sqlite3" "*.db"
+          -x "*.git*" "*.pyc" "__pycache__/*" "*.log" "venv/*" ".venv/*" "antenv/*" "*.sqlite3" "*.db"
         cd ..
         echo "=== Verificando contenido del ZIP ==="
-        unzip -l backend-deploy.zip | head -30
+        unzip -l backend-deploy.zip | grep -E "(startup.sh|build.sh|requirements.txt|manage.py|middleware.py|settings.py)" | head -15
         ls -lh backend-deploy.zip
+        echo "=== Verificando que middleware.py esté en el ZIP ==="
+        unzip -l backend-deploy.zip | grep "middleware.py" || echo "⚠️ middleware.py no encontrado en ZIP"
 
     - name: Desplegar a Azure App Service
       uses: azure/webapps-deploy@v3
@@ -70,3 +65,12 @@ jobs:
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: ./backend-deploy.zip
 
+    - name: Verificar despliegue
+      run: |
+        echo "✅ Despliegue completado"
+        echo ""
+        echo "📝 IMPORTANTE: Si es la primera vez o el startup command no está configurado,"
+        echo "   ejecuta localmente: ./fix-backend-startup.sh"
+        echo "   El comando de inicio persiste en Azure entre despliegues."
+
+        
