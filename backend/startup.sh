@@ -1,48 +1,63 @@
 #!/bin/bash
-# NO usar set -e para que el script continúe incluso si hay errores
-# Script de inicio definitivo para Azure App Service
+# Script de inicio para Azure App Service
+set -e
+
 echo "=== INICIANDO ECOALERTA BACKEND ==="
 
 # Cambiar al directorio de la aplicación
-cd /home/site/wwwroot || exit 1
+cd /home/site/wwwroot
 echo "Directorio: $(pwd)"
 
-# NO instalar GDAL/GEOS - no se usan PostGIS
-# Eliminado para evitar errores
+# Instalar libpq-dev si no está disponible (para PostgreSQL)
+if ! dpkg -l | grep -q libpq-dev; then
+    echo "Instalando libpq-dev..."
+    apt-get update -qq && apt-get install -y -qq libpq-dev > /dev/null 2>&1 || echo "⚠️ No se pudo instalar libpq-dev"
+fi
 
 # Crear o activar entorno virtual
 if [ ! -d "antenv" ]; then
     echo "Creando entorno virtual..."
     python3.11 -m venv antenv
     source antenv/bin/activate
-    echo "Actualizando pip..."
-    pip install --upgrade pip --quiet || true
+    pip install --upgrade pip --quiet
     echo "Instalando dependencias..."
-    pip install -r requirements.txt --quiet || echo "⚠️ Error instalando dependencias"
+    pip install -r requirements.txt --quiet
 else
     echo "Activando entorno virtual existente..."
-    source antenv/bin/activate || exit 1
+    source antenv/bin/activate
 fi
 
 echo "Python: $(which python)"
-echo "Gunicorn: $(which gunicorn)"
+echo "Python version: $(python --version)"
 
-# NO configurar GDAL/GEOS - no se usan
+# Verificar que Django está instalado
+python -c "import django; print(f'Django {django.get_version()}')" || {
+    echo "❌ ERROR: Django no está instalado"
+    exit 1
+}
 
-# Ejecutar migraciones (con manejo de errores)
+# Ejecutar migraciones
 echo "Ejecutando migraciones..."
-python manage.py migrate --noinput 2>&1 || {
-    echo "⚠️ Error en migraciones, intentando continuar..."
-    # Si las migraciones fallan, al menos intentar iniciar el servidor
+python manage.py migrate --noinput || {
+    echo "⚠️ ERROR en migraciones"
+    exit 1
 }
 
-# Recopilar archivos estáticos (con manejo de errores)
+# Recopilar archivos estáticos
 echo "Recopilando archivos estáticos..."
-python manage.py collectstatic --noinput 2>&1 || {
-    echo "⚠️ Error en collectstatic, continuando sin archivos estáticos..."
+python manage.py collectstatic --noinput --clear || {
+    echo "⚠️ ERROR en collectstatic"
+    exit 1
 }
 
-# Iniciar Gunicorn (DEBE quedarse corriendo)
+# Verificar que la aplicación puede iniciar
+echo "Verificando configuración de Django..."
+python manage.py check --deploy || {
+    echo "⚠️ ERROR en verificación de Django"
+    exit 1
+}
+
+# Iniciar Gunicorn
 echo "=== INICIANDO GUNICORN ==="
 exec gunicorn ecoalerta.wsgi:application \
     --bind 0.0.0.0:8000 \
@@ -51,5 +66,4 @@ exec gunicorn ecoalerta.wsgi:application \
     --access-logfile - \
     --error-logfile - \
     --log-level info \
-    --capture-output \
-    --preload
+    --capture-output
