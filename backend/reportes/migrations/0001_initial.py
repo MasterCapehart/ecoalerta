@@ -66,7 +66,10 @@ class Migration(migrations.Migration):
                 ('descripcion', models.TextField(blank=True)),
                 ('email', models.EmailField(blank=True, max_length=254)),
                 ('foto', models.ImageField(blank=True, null=True, upload_to='reportes/')),
-                ('ubicacion', django.contrib.gis.db.models.fields.PointField(blank=True, null=True, srid=4326)),
+                # Campo ubicacion removido - usando ubicacion_lat y ubicacion_lng en su lugar
+                # ('ubicacion', django.contrib.gis.db.models.fields.PointField(blank=True, null=True, srid=4326)),
+                ('ubicacion_lat', models.FloatField(blank=True, null=True, db_index=True)),
+                ('ubicacion_lng', models.FloatField(blank=True, null=True, db_index=True)),
                 ('direccion', models.CharField(blank=True, max_length=255)),
                 ('estado', models.CharField(choices=[('nuevo', 'Nuevo'), ('proceso', 'En Proceso'), ('resuelto', 'Resuelto'), ('cerrado', 'Cerrado')], default='nuevo', max_length=20)),
                 ('notas_internas', models.TextField(blank=True)),
