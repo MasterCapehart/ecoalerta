@@ -116,12 +116,22 @@ class CategoriaResiduoViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
 
 
-@api_view(['POST'])
+@api_view(['POST', 'GET'])
 @permission_classes([AllowAny])
 def login_view(request):
     """
     Endpoint para autenticación de usuarios
+    Maneja tanto POST como GET para evitar redirecciones
     """
+    # Si es GET, devolver información del endpoint sin redirección
+    if request.method == 'GET':
+        return Response({
+            'endpoint': '/api/auth/login/',
+            'method': 'POST',
+            'message': 'Este endpoint requiere POST con username y password'
+        }, status=200)
+    
+    # Procesar POST normalmente
     serializer = LoginSerializer(data=request.data)
     
     if serializer.is_valid():
@@ -140,7 +150,7 @@ def login_view(request):
                         'username': user.username,
                         'tipo': user.tipo
                     }
-                })
+                }, status=200)
             else:
                 return Response(
                     {'error': 'No tienes permisos para acceder'}, 

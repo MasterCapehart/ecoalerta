@@ -24,66 +24,46 @@ class PreventRedirectsMiddleware(MiddlewareMixin):
     Se ejecuta ÚLTIMO para interceptar redirecciones después de todos los otros middlewares
     """
     def process_response(self, request, response):
-        # Interceptar TODAS las redirecciones en API endpoints
-        if request.path.startswith('/api/') and response.status_code in [301, 302, 303, 307, 308]:
-            location = response.get('Location', '')
-            request_url = request.build_absolute_uri()
-            
-            # Normalizar URLs para comparación
-            location_normalized = location.rstrip('/') if location else ''
-            request_url_normalized = request_url.rstrip('/')
-            
-            # Log para debugging
-            logger.error(f"🚨 Redirección detectada en API: {request.path} -> {location}")
-            logger.error(f"   Request URL: {request_url}")
-            logger.error(f"   Location: {location}")
-            logger.error(f"   Method: {request.method}")
-            
-            # Si la redirección es a la misma URL, es un bucle
-            if location_normalized == request_url_normalized or location_normalized in request_url_normalized:
-                logger.error(f"🚨 BUCLE DE REDIRECCIÓN DETECTADO: {location} == {request_url}")
+        # Interceptar TODAS las redirecciones en API endpoints - FORZAR interceptación
+        if request.path.startswith('/api/'):
+            # Si hay cualquier redirección (incluso si es a la misma URL)
+            if response.status_code in [301, 302, 303, 307, 308]:
+                location = response.get('Location', '')
+                request_url = request.build_absolute_uri()
+                
+                # NUNCA permitir redirecciones en API - devolver error inmediatamente
+                logger.error(f"🚨 REDIRECCIÓN BLOQUEADA EN API: {request.path} -> {location}")
+                logger.error(f"   Request URL: {request_url}")
+                logger.error(f"   Method: {request.method}")
+                logger.error(f"   Status: {response.status_code}")
+                
+                # Devolver respuesta JSON directamente sin redirección
                 return JsonResponse({
-                    'error': 'Bucle de redirección detectado',
+                    'error': 'Redirección bloqueada en endpoint API',
                     'path': request.path,
                     'method': request.method,
                     'status_code': response.status_code,
                     'location': location,
                     'request_url': request_url,
-                    'message': 'El servidor está redirigiendo a la misma URL. Verifica la configuración de Django y Azure.',
-                    'debug_info': {
-                        'APPEND_SLASH': getattr(request, 'APPEND_SLASH', 'unknown'),
-                        'SECURE_SSL_REDIRECT': getattr(request, 'SECURE_SSL_REDIRECT', 'unknown'),
-                    }
-                }, status=500)
+                    'message': 'Las redirecciones no están permitidas en endpoints API.',
+                    'fix': 'Verifica la configuración de Django y Azure. SecurityMiddleware y CommonMiddleware deben estar desactivados.'
+                }, status=400)
             
-            # Para cualquier otra redirección en API, devolver error JSON
-            # Esto evita bucles y proporciona información de debugging
-            return JsonResponse({
-                'error': 'Redirección detectada en endpoint API',
-                'path': request.path,
-                'method': request.method,
-                'status_code': response.status_code,
-                'location': location,
-                'request_url': request_url,
-                'message': 'Las redirecciones no están permitidas en endpoints API. Esto indica un problema de configuración.',
-                'debug_info': {
-                    'APPEND_SLASH': getattr(request, 'APPEND_SLASH', 'unknown'),
-                    'SECURE_SSL_REDIRECT': getattr(request, 'SECURE_SSL_REDIRECT', 'unknown'),
-                }
-            }, status=500)
+            # Si no hay redirección pero la respuesta no es exitosa, loggear para debugging
+            if response.status_code >= 400:
+                logger.warning(f"⚠️ Respuesta de error en API: {request.path} -> {response.status_code}")
         
-        # También interceptar redirecciones en la raíz si es necesario
+        # Interceptar redirecciones en la raíz
         if request.path == '/' and response.status_code in [301, 302, 303, 307, 308]:
             location = response.get('Location', '')
-            # Si la redirección es a la misma URL, evitar el bucle
-            if location and location.rstrip('/') == request.build_absolute_uri('/').rstrip('/'):
-                logger.error(f"🚨 Bucle de redirección detectado en raíz: {location}")
-                return JsonResponse({
-                    'error': 'Bucle de redirección detectado',
-                    'path': request.path,
-                    'location': location,
-                    'message': 'El servidor está redirigiendo a la misma URL.'
-                }, status=500)
+            logger.error(f"🚨 Redirección bloqueada en raíz: {location}")
+            # Devolver respuesta JSON en lugar de redirección
+            return JsonResponse({
+                'error': 'Redirección bloqueada en raíz',
+                'path': request.path,
+                'location': location,
+                'message': 'Las redirecciones en la raíz no están permitidas.'
+            }, status=400)
         
         return response
 
