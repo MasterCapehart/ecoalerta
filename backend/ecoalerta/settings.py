@@ -42,17 +42,18 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'ecoalerta.middleware.PreventRedirectsMiddleware',  # Prevenir redirecciones en API (PRIMERO)
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'ecoalerta.middleware.DisableCSRFForAPI',  # Desactivar CSRF para API
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
+    # CommonMiddleware DESACTIVADO temporalmente - está causando redirecciones 301
+    # 'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'ecoalerta.middleware.PreventRedirectsMiddleware',  # Prevenir redirecciones en API (ÚLTIMO - intercepta después de todos)
 ]
 
 ROOT_URLCONF = 'ecoalerta.urls'

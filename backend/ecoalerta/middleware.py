@@ -21,7 +21,7 @@ class DisableCSRFForAPI(MiddlewareMixin):
 class PreventRedirectsMiddleware(MiddlewareMixin):
     """
     Middleware para prevenir redirecciones no deseadas en API endpoints
-    Se ejecuta DESPUÉS de SecurityMiddleware para interceptar sus redirecciones
+    Se ejecuta ÚLTIMO para interceptar redirecciones después de todos los otros middlewares
     """
     def process_response(self, request, response):
         # Interceptar TODAS las redirecciones en API endpoints
@@ -29,10 +29,34 @@ class PreventRedirectsMiddleware(MiddlewareMixin):
             location = response.get('Location', '')
             request_url = request.build_absolute_uri()
             
-            # Log para debugging
-            logger.warning(f"Redirección detectada en API: {request.path} -> {location}")
+            # Normalizar URLs para comparación
+            location_normalized = location.rstrip('/') if location else ''
+            request_url_normalized = request_url.rstrip('/')
             
-            # Para TODAS las redirecciones en API, devolver error JSON
+            # Log para debugging
+            logger.error(f"🚨 Redirección detectada en API: {request.path} -> {location}")
+            logger.error(f"   Request URL: {request_url}")
+            logger.error(f"   Location: {location}")
+            logger.error(f"   Method: {request.method}")
+            
+            # Si la redirección es a la misma URL, es un bucle
+            if location_normalized == request_url_normalized or location_normalized in request_url_normalized:
+                logger.error(f"🚨 BUCLE DE REDIRECCIÓN DETECTADO: {location} == {request_url}")
+                return JsonResponse({
+                    'error': 'Bucle de redirección detectado',
+                    'path': request.path,
+                    'method': request.method,
+                    'status_code': response.status_code,
+                    'location': location,
+                    'request_url': request_url,
+                    'message': 'El servidor está redirigiendo a la misma URL. Verifica la configuración de Django y Azure.',
+                    'debug_info': {
+                        'APPEND_SLASH': getattr(request, 'APPEND_SLASH', 'unknown'),
+                        'SECURE_SSL_REDIRECT': getattr(request, 'SECURE_SSL_REDIRECT', 'unknown'),
+                    }
+                }, status=500)
+            
+            # Para cualquier otra redirección en API, devolver error JSON
             # Esto evita bucles y proporciona información de debugging
             return JsonResponse({
                 'error': 'Redirección detectada en endpoint API',
@@ -41,7 +65,11 @@ class PreventRedirectsMiddleware(MiddlewareMixin):
                 'status_code': response.status_code,
                 'location': location,
                 'request_url': request_url,
-                'message': 'Las redirecciones no están permitidas en endpoints API. Esto indica un problema de configuración.'
+                'message': 'Las redirecciones no están permitidas en endpoints API. Esto indica un problema de configuración.',
+                'debug_info': {
+                    'APPEND_SLASH': getattr(request, 'APPEND_SLASH', 'unknown'),
+                    'SECURE_SSL_REDIRECT': getattr(request, 'SECURE_SSL_REDIRECT', 'unknown'),
+                }
             }, status=500)
         
         # También interceptar redirecciones en la raíz si es necesario
@@ -49,7 +77,7 @@ class PreventRedirectsMiddleware(MiddlewareMixin):
             location = response.get('Location', '')
             # Si la redirección es a la misma URL, evitar el bucle
             if location and location.rstrip('/') == request.build_absolute_uri('/').rstrip('/'):
-                logger.warning(f"Bucle de redirección detectado en raíz: {location}")
+                logger.error(f"🚨 Bucle de redirección detectado en raíz: {location}")
                 return JsonResponse({
                     'error': 'Bucle de redirección detectado',
                     'path': request.path,
