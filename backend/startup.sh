@@ -54,12 +54,21 @@ python -c "import django; print(f'Django {django.get_version()}')" 2>&1 || {
     exit 1
 }
 
-# Verificar que la aplicación puede cargar
+# Verificar que la aplicación puede cargar (con manejo de errores para GDAL)
 echo "Verificando que Django puede cargar settings..."
-python -c "import django; django.setup(); from django.conf import settings; print(f'Apps instaladas: {len(settings.INSTALLED_APPS)}')" 2>&1 || {
-    echo "⚠️ ERROR: Django no puede cargar settings"
-    python manage.py check 2>&1 | head -20
+python -c "
+import os
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ecoalerta.settings')
+try:
+    import django
+    django.setup()
+    from django.conf import settings
+    print(f'✅ Django OK - Apps instaladas: {len(settings.INSTALLED_APPS)}')
+except Exception as e:
+    print(f'⚠️ ADVERTENCIA al cargar Django: {e}')
     # Continuar de todas formas
+" 2>&1 || {
+    echo "⚠️ ADVERTENCIA: Problema al verificar Django (continuando)"
 }
 
 # Ejecutar migraciones (continuar aunque falle)
