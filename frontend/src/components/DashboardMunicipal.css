@@ -299,6 +299,15 @@ tr:hover {
   border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
+  transition: background 0.2s;
+}
+
+.btn-action:hover {
+  background: #1e7a1e;
+}
+
+.btn-action:active {
+  background: #1a6b1a;
 }
 
 .modal-overlay {
@@ -308,12 +317,20 @@ tr:hover {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  /* By default the overlay should not block interaction unless explicitly shown.
-     Use the JavaScript to toggle the `show` class when opening a modal. */
-  display: none;
+  display: flex !important;
   justify-content: center;
   align-items: center;
-  z-index: 9999;
+  z-index: 99999;
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-content {
@@ -324,6 +341,21 @@ tr:hover {
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
+  position: relative;
+  z-index: 100000;
+  animation: slideIn 0.3s ease-out;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .modal-header {

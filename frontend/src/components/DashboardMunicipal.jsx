@@ -180,6 +180,10 @@ function HeatmapLayer({ data, enabled }) {
     } catch (error) {
       console.error('HeatmapLayer: Error creating heatmap layer', error)
       console.error('Error details:', error.message, error.stack)
+      // Mostrar mensaje de error más descriptivo
+      if (error.message) {
+        console.error('Error específico:', error.message)
+      }
     }
 
     // Crear handler de clic para mostrar popup de hotspots
@@ -296,6 +300,8 @@ function DashboardMunicipal() {
       const response = await fetch(url)
       
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error('HTTP error response:', response.status, errorText)
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
@@ -303,8 +309,22 @@ function DashboardMunicipal() {
       console.log('Heatmap data received:', data)
       
       if (data.data && Array.isArray(data.data)) {
-        setHeatmapData(data.data)
-        console.log('Heatmap data set, points:', data.data.length)
+        if (data.data.length > 0) {
+          setHeatmapData(data.data)
+          console.log('Heatmap data set, points:', data.data.length)
+        } else {
+          console.warn('Heatmap data is empty array')
+          setHeatmapData([])
+        }
+      } else if (Array.isArray(data)) {
+        // Si la respuesta es directamente un array
+        if (data.length > 0) {
+          setHeatmapData(data)
+          console.log('Heatmap data set (direct array), points:', data.length)
+        } else {
+          console.warn('Heatmap data is empty array')
+          setHeatmapData([])
+        }
       } else {
         console.warn('No heatmap data found in response:', data)
         setHeatmapData([])
@@ -312,6 +332,8 @@ function DashboardMunicipal() {
     } catch (error) {
       console.error('Error al cargar datos del heatmap:', error)
       setHeatmapData([])
+      // Mostrar mensaje de error al usuario
+      alert('Error al cargar el mapa de calor. Por favor, intente nuevamente.')
     } finally {
       setLoadingHeatmap(false)
     }
@@ -342,8 +364,10 @@ function DashboardMunicipal() {
   }
 
   const handleVerDetalle = (reporte) => {
+    console.log('handleVerDetalle llamado con:', reporte)
     setReporteSeleccionado(reporte)
     setShowModal(true)
+    console.log('Modal debería mostrarse ahora')
   }
 
   const handleGuardarCambios = async () => {
@@ -472,7 +496,7 @@ function DashboardMunicipal() {
                   <span style={{ fontWeight: 500 }}>🔥 Mapa de Calor</span>
                   {loadingHeatmap && <span style={{ fontSize: '12px', color: '#666' }}>(Cargando...)</span>}
                   {heatmapEnabled && !loadingHeatmap && heatmapData.length === 0 && (
-                    <span style={{ fontSize: '12px', color: '#ff6b6b' }}>(Sin datos)</span>
+                    <span style={{ fontSize: '12px', color: '#ff6b6b' }}>(Sin datos - verifique que haya reportes con ubicación)</span>
                   )}
                   {heatmapEnabled && !loadingHeatmap && heatmapData.length > 0 && (
                     <span style={{ fontSize: '12px', color: '#228B22' }}>({heatmapData.length} puntos)</span>
@@ -508,7 +532,7 @@ function DashboardMunicipal() {
                   />
                   {/* Capa de Heatmap */}
                   <HeatmapLayer data={heatmapData} enabled={heatmapEnabled} />
-                  {/* Marcadores de reportes */}
+                  {/* Marcadores de reportes - siempre visibles cuando el mapa de calor está desactivado */}
                   {!heatmapEnabled && reportes
                     .filter(reporte => reporte.lat && reporte.lng)
                     .map(reporte => (
@@ -586,7 +610,13 @@ function DashboardMunicipal() {
                         <td>
                           <button 
                             className="btn-action"
-                            onClick={() => handleVerDetalle(reporte)}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              console.log('Botón Ver clickeado para reporte:', reporte)
+                              handleVerDetalle(reporte)
+                            }}
+                            type="button"
                           >
                             Ver
                           </button>
@@ -604,11 +634,27 @@ function DashboardMunicipal() {
 
       {/* Modal Detalle */}
       {showModal && reporteSeleccionado && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div 
+          className="modal-overlay" 
+          onClick={() => {
+            console.log('Clic en overlay, cerrando modal')
+            setShowModal(false)
+            setReporteSeleccionado(null)
+          }}
+        >
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Detalle de Reporte</h2>
-              <span className="close-btn" onClick={() => setShowModal(false)}>&times;</span>
+              <span 
+                className="close-btn" 
+                onClick={() => {
+                  console.log('Clic en botón cerrar')
+                  setShowModal(false)
+                  setReporteSeleccionado(null)
+                }}
+              >
+                &times;
+              </span>
             </div>
             
             <div className="detail-group">
