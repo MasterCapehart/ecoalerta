@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView,
 )
+from rest_framework.permissions import AllowAny
 from reportes.serializers import CustomTokenObtainPairSerializer
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -43,15 +44,28 @@ urlpatterns = [
     path('', root_view, name='root'),
     path('admin/', admin.site.urls),
     
-    # JWT Authentication endpoints
-    path('api/auth/token/', TokenObtainPairView.as_view(serializer_class=CustomTokenObtainPairSerializer), name='token_obtain_pair'),
-    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/auth/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
+    # JWT Authentication endpoints (públicos - no requieren autenticación)
+    path('api/auth/token/', TokenObtainPairView.as_view(
+        serializer_class=CustomTokenObtainPairSerializer,
+        permission_classes=[AllowAny]
+    ), name='token_obtain_pair'),
+    path('api/auth/token/refresh/', TokenRefreshView.as_view(
+        permission_classes=[AllowAny]
+    ), name='token_refresh'),
+    path('api/auth/token/verify/', TokenVerifyView.as_view(
+        permission_classes=[AllowAny]
+    ), name='token_verify'),
     
-    # API Documentation (Swagger/OpenAPI)
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    # API Documentation (Swagger/OpenAPI) - públicos
+    path('api/schema/', SpectacularAPIView.as_view(permission_classes=[AllowAny]), name='schema'),
+    path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(
+        url_name='schema',
+        permission_classes=[AllowAny]
+    ), name='swagger-ui'),
+    path('api/schema/redoc/', SpectacularRedocView.as_view(
+        url_name='schema',
+        permission_classes=[AllowAny]
+    ), name='redoc'),
     
     # API endpoints
     path('api/', include('reportes.urls')),

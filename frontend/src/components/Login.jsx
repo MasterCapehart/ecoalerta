@@ -18,6 +18,7 @@ function Login() {
     setError('')
     
     try {
+      console.log('Intentando conectar a:', API_ENDPOINTS.JWT_LOGIN)
       const response = await fetch(API_ENDPOINTS.JWT_LOGIN, {
         method: 'POST',
         headers: {
@@ -26,7 +27,18 @@ function Login() {
         body: JSON.stringify({ username: usuario, password: password }),
       })
 
-      const data = await response.json()
+      console.log('Respuesta recibida:', response.status, response.statusText)
+
+      // Intentar parsear JSON, pero manejar errores si no es JSON
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        const text = await response.text()
+        console.error('Error parseando JSON:', text)
+        setError(`Error del servidor (${response.status}): ${text.substring(0, 200)}`)
+        return
+      }
 
       if (response.ok && data.access && data.user) {
         // Verificar que el usuario sea inspector o admin
@@ -38,11 +50,23 @@ function Login() {
           setError('No tienes permisos para acceder. Solo inspectores y administradores pueden acceder.')
         }
       } else {
-        setError(data.detail || data.error || 'Credenciales incorrectas')
+        // Mejor manejo de errores de autenticación
+        if (response.status === 401) {
+          setError(data.detail || data.error || 'Credenciales incorrectas')
+        } else if (response.status === 500) {
+          setError('Error interno del servidor. Por favor, intenta más tarde.')
+        } else {
+          setError(data.detail || data.error || `Error (${response.status}): ${response.statusText}`)
+        }
       }
     } catch (error) {
       console.error('Error al conectar con el servidor:', error)
-      setError('Error al conectar con el servidor. Verifica que el backend esté corriendo.')
+      // Verificar si es un error de red
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        setError(`No se pudo conectar al servidor. Verifica que el backend esté corriendo en: ${API_ENDPOINTS.JWT_LOGIN}`)
+      } else {
+        setError(`Error de conexión: ${error.message}`)
+      }
     } finally {
       setLoading(false)
     }
