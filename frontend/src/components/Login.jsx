@@ -17,27 +17,36 @@ function Login() {
     setLoading(true)
     setError('')
     
+    // Intentar primero con JWT, si falla usar login antiguo como fallback
     try {
       console.log('Intentando conectar a:', API_ENDPOINTS.JWT_LOGIN)
+      
+      // Timeout de 10 segundos
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      
       const response = await fetch(API_ENDPOINTS.JWT_LOGIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username: usuario, password: password }),
+        signal: controller.signal
       })
+      
+      clearTimeout(timeoutId)
 
       console.log('Respuesta recibida:', response.status, response.statusText)
 
-      // Intentar parsear JSON, pero manejar errores si no es JSON
+      // Intentar parsear JSON
       let data
       try {
         data = await response.json()
       } catch (jsonError) {
         const text = await response.text()
         console.error('Error parseando JSON:', text)
-        setError(`Error del servidor (${response.status}): ${text.substring(0, 200)}`)
-        return
+        // Si falla JWT, intentar login antiguo
+        return await tryLegacyLogin()
       }
 
       if (response.ok && data.access && data.user) {
@@ -46,29 +55,61 @@ function Login() {
           // Guardar tokens y datos del usuario
           saveAuthData(data.access, data.refresh, data.user)
           navigate('/dashboard')
+          return
         } else {
           setError('No tienes permisos para acceder. Solo inspectores y administradores pueden acceder.')
+          return
         }
       } else {
+        // Si JWT falla, intentar login antiguo
+        if (response.status >= 500 || response.status === 0) {
+          return await tryLegacyLogin()
+        }
         // Mejor manejo de errores de autenticación
         if (response.status === 401) {
           setError(data.detail || data.error || 'Credenciales incorrectas')
-        } else if (response.status === 500) {
-          setError('Error interno del servidor. Por favor, intenta más tarde.')
         } else {
           setError(data.detail || data.error || `Error (${response.status}): ${response.statusText}`)
         }
       }
     } catch (error) {
-      console.error('Error al conectar con el servidor:', error)
-      // Verificar si es un error de red
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        setError(`No se pudo conectar al servidor. Verifica que el backend esté corriendo en: ${API_ENDPOINTS.JWT_LOGIN}`)
-      } else {
-        setError(`Error de conexión: ${error.message}`)
+      console.error('Error al conectar con JWT:', error)
+      // Si falla completamente, intentar login antiguo
+      if (error.name === 'AbortError' || error.name === 'TypeError') {
+        return await tryLegacyLogin()
       }
+      setError(`Error de conexión: ${error.message}`)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Función de fallback al login antiguo
+  const tryLegacyLogin = async () => {
+    try {
+      console.log('Intentando login antiguo como fallback...')
+      const response = await fetch(API_ENDPOINTS.LOGIN, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: usuario, password: password }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Guardar datos del usuario (sin JWT)
+        localStorage.setItem('user', JSON.stringify(data.user))
+        // Simular token para compatibilidad
+        localStorage.setItem('access_token', 'legacy-auth')
+        navigate('/dashboard')
+      } else {
+        setError(data.error || 'Credenciales incorrectas')
+      }
+    } catch (error) {
+      console.error('Error en login antiguo:', error)
+      setError('No se pudo conectar al servidor. Verifica que el backend esté corriendo.')
     }
   }
 

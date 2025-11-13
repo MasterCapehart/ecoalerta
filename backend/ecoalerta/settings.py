@@ -192,8 +192,8 @@ azure_frontend_url = os.getenv('AZURE_FRONTEND_URL', '')
 if azure_frontend_url:
     CORS_ALLOWED_ORIGINS.append(azure_frontend_url)
 
-# Permitir todos los orígenes de Azure Static Web Apps (temporal para debugging)
-CORS_ALLOW_ALL_ORIGINS = False  # Mantener False para seguridad
+# Permitir todos los orígenes temporalmente para debugging (cambiar a False en producción)
+CORS_ALLOW_ALL_ORIGINS = True  # Temporalmente True para solucionar problemas de CORS
 CORS_ALLOW_CREDENTIALS = True
 
 # Configuración adicional de CORS para evitar problemas

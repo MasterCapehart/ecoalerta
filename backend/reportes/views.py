@@ -92,13 +92,20 @@ class ReporteViewSet(viewsets.ModelViewSet):
     def actualizar_estado(self, request, pk=None):
         """
         Actualizar el estado de un reporte
-        Requiere autenticación JWT
+        Requiere autenticación JWT o sesión
         """
         reporte = self.get_object()
         nuevo_estado = request.data.get('estado')
         notas = request.data.get('notas_internas', '')
         
         # Verificar que el usuario sea inspector o admin
+        # Permitir si tiene token JWT válido O si tiene sesión activa
+        if not request.user.is_authenticated:
+            return Response(
+                {'error': 'No autenticado'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
         if request.user.tipo not in ['inspector', 'admin'] and not request.user.is_staff:
             return Response(
                 {'error': 'No tienes permisos para actualizar reportes'}, 
@@ -123,9 +130,15 @@ class ReporteViewSet(viewsets.ModelViewSet):
     def estadisticas(self, request):
         """
         Obtener estadísticas de reportes
-        Requiere autenticación JWT
+        Requiere autenticación JWT o sesión
         """
         # Verificar que el usuario sea inspector o admin
+        if not request.user.is_authenticated:
+            return Response(
+                {'error': 'No autenticado'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
         if request.user.tipo not in ['inspector', 'admin'] and not request.user.is_staff:
             return Response(
                 {'error': 'No tienes permisos para ver estadísticas'}, 
@@ -160,7 +173,7 @@ class CategoriaResiduoViewSet(viewsets.ReadOnlyModelViewSet):
 @permission_classes([AllowAny])
 def login_view(request):
     """
-    Endpoint para autenticación de usuarios
+    Endpoint para autenticación de usuarios (LEGACY - mantener para compatibilidad)
     Maneja tanto POST como GET para evitar redirecciones
     """
     # Si es GET, devolver información del endpoint sin redirección
@@ -168,7 +181,8 @@ def login_view(request):
         return Response({
             'endpoint': '/api/auth/login/',
             'method': 'POST',
-            'message': 'Este endpoint requiere POST con username y password'
+            'message': 'Este endpoint requiere POST con username y password',
+            'note': 'Este es el endpoint legacy. Se recomienda usar /api/auth/token/ para JWT'
         }, status=200)
     
     # Procesar POST normalmente
@@ -203,6 +217,19 @@ def login_view(request):
             )
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health_check(request):
+    """
+    Endpoint simple de health check
+    """
+    return Response({
+        'status': 'ok',
+        'service': 'EcoAlerta Backend',
+        'timestamp': str(connection.ensure_connection())
+    })
 
 
 @api_view(['GET'])
@@ -367,4 +394,3 @@ def heatmap_view(request):
             'error': str(e),
             'params': {}
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
