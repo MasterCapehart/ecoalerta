@@ -97,13 +97,16 @@ python manage.py check 2>&1 | tail -10 || {
 
 # Iniciar Gunicorn (DEBE funcionar)
 echo "=== INICIANDO GUNICORN ==="
-echo "Comando: gunicorn ecoalerta.wsgi:application --bind 0.0.0.0:8000 --workers 2"
+# Azure App Service usa la variable de entorno PORT
+PORT="${PORT:-8000}"
+echo "Usando puerto: $PORT"
+echo "Comando: gunicorn ecoalerta.wsgi:application --bind 0.0.0.0:$PORT --workers 2"
 exec gunicorn ecoalerta.wsgi:application \
-    --bind 0.0.0.0:8000 \
+    --bind 0.0.0.0:$PORT \
     --workers 2 \
     --timeout 120 \
     --access-logfile - \
     --error-logfile - \
-    --log-level debug \
+    --log-level info \
     --capture-output \
     --enable-stdio-inheritance
