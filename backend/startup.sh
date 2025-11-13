@@ -60,6 +60,30 @@ python -c "import django; print(f'Django {django.get_version()}')" 2>&1 || {
     exit 1
 }
 
+# Verificar dependencias nuevas (JWT, Swagger)
+echo "Verificando dependencias nuevas..."
+python -c "
+try:
+    import rest_framework_simplejwt
+    print('✅ rest_framework_simplejwt OK')
+except ImportError as e:
+    print(f'❌ ERROR: rest_framework_simplejwt no instalado: {e}')
+    exit(1)
+" 2>&1 || {
+    echo "⚠️ ADVERTENCIA: Problema con rest_framework_simplejwt (continuando)"
+}
+
+python -c "
+try:
+    import drf_spectacular
+    print('✅ drf_spectacular OK')
+except ImportError as e:
+    print(f'❌ ERROR: drf_spectacular no instalado: {e}')
+    exit(1)
+" 2>&1 || {
+    echo "⚠️ ADVERTENCIA: Problema con drf_spectacular (continuando)"
+}
+
 # Verificar que la aplicación puede cargar (con manejo de errores para GDAL)
 echo "Verificando que Django puede cargar settings..."
 python -c "
