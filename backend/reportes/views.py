@@ -165,6 +165,7 @@ def login_view(request):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def heatmap_view(request):
     """
     Endpoint para obtener datos de densidad de reportes para el mapa de calor.

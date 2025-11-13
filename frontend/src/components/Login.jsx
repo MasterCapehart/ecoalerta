@@ -15,6 +15,9 @@ function Login() {
     setLoading(true)
     
     try {
+      console.log('Intentando login en:', API_ENDPOINTS.LOGIN)
+      console.log('Usuario:', usuario)
+      
       const response = await fetch(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: {
@@ -23,18 +26,35 @@ function Login() {
         body: JSON.stringify({ username: usuario, password: password }),
       })
 
+      console.log('Respuesta status:', response.status)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Error del servidor:', errorText)
+        try {
+          const errorData = JSON.parse(errorText)
+          alert(errorData.error || `Error ${response.status}: ${response.statusText}`)
+        } catch {
+          alert(`Error ${response.status}: ${errorText.substring(0, 100)}`)
+        }
+        return
+      }
+
       const data = await response.json()
+      console.log('Datos recibidos:', data)
 
       if (data.success) {
         // Guardar datos del usuario en localStorage
         localStorage.setItem('user', JSON.stringify(data.user))
+        console.log('Usuario guardado, navegando a dashboard...')
         navigate('/dashboard')
       } else {
         alert(data.error || 'Credenciales incorrectas')
       }
     } catch (error) {
       console.error('Error al conectar con el servidor:', error)
-      alert('Error al conectar con el servidor. Verifica que el backend esté corriendo.')
+      console.error('URL intentada:', API_ENDPOINTS.LOGIN)
+      alert(`Error al conectar con el servidor: ${error.message}\n\nURL: ${API_ENDPOINTS.LOGIN}`)
     } finally {
       setLoading(false)
     }
