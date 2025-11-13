@@ -7,10 +7,18 @@ const DEVELOPMENT_API_URL = 'http://localhost:8000';
 export const API_URL = import.meta.env.VITE_API_URL || (isProduction ? PRODUCTION_API_URL : DEVELOPMENT_API_URL);
 
 export const API_ENDPOINTS = {
+  // JWT Authentication
+  JWT_LOGIN: `${API_URL}/api/auth/token/`,
+  JWT_REFRESH: `${API_URL}/api/auth/token/refresh/`,
+  JWT_VERIFY: `${API_URL}/api/auth/token/verify/`,
+  // Legacy login (mantener para compatibilidad)
   LOGIN: `${API_URL}/api/auth/login/`,
+  // API endpoints
   REPORTES: `${API_URL}/api/reportes/`,
   CATEGORIAS: `${API_URL}/api/categorias/`,
   ESTADISTICAS: `${API_URL}/api/reportes/estadisticas/`,
   HEATMAP: `${API_URL}/api/analytics/heatmap/`,
+  // API Documentation
+  SWAGGER: `${API_URL}/api/schema/swagger-ui/`,
 };
 

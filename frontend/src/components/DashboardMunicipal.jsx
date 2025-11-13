@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './DashboardMunicipal.css'
 import { API_ENDPOINTS } from '../config'
+import { getAuthHeaders, logout } from '../services/auth'
 
 // Fix iconos Leaflet
 import L from 'leaflet'
@@ -355,7 +356,17 @@ function DashboardMunicipal() {
 
   const fetchEstadisticas = async () => {
     try {
-      const response = await fetch(API_ENDPOINTS.ESTADISTICAS)
+      const response = await fetch(API_ENDPOINTS.ESTADISTICAS, {
+        headers: getAuthHeaders()
+      })
+      
+      if (response.status === 401) {
+        // Token expirado o inválido
+        logout()
+        window.location.href = '/login'
+        return
+      }
+      
       const data = await response.json()
       setEstadisticas(data)
     } catch (error) {
@@ -379,20 +390,28 @@ function DashboardMunicipal() {
     try {
       const response = await fetch(`${API_ENDPOINTS.REPORTES}${reporteSeleccionado.id}/actualizar_estado/`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           estado: nuevoEstado,
           notas_internas: notasInternas
         })
       })
 
+      if (response.status === 401) {
+        // Token expirado o inválido
+        logout()
+        window.location.href = '/login'
+        return
+      }
+
       if (response.ok) {
         fetchReportes()
         fetchEstadisticas()
         setShowModal(false)
         alert('Cambios guardados exitosamente')
+      } else {
+        const errorData = await response.json()
+        alert(errorData.error || 'Error al guardar cambios')
       }
     } catch (error) {
       console.error('Error al actualizar:', error)
@@ -407,9 +426,12 @@ function DashboardMunicipal() {
         <h1>🌱 EcoAlerta - Dashboard Municipal</h1>
         <div className="user-info">
           <span>👤 Inspector Municipal</span>
-          <button className="logout-btn" onClick={() => window.location.href = '/login'}>
+          <button className="logout-btn" onClick={() => {
+            logout()
+            window.location.href = '/login'
+          }}>
             Cerrar Sesión
-            </button>
+          </button>
         </div>
       </div>
 

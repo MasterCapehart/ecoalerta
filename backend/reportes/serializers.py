@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import Reporte, CategoriaResiduo, Usuario, Notificacion
 
 
@@ -94,4 +95,34 @@ class EstadisticasSerializer(serializers.Serializer):
     nuevos = serializers.IntegerField()
     en_proceso = serializers.IntegerField()
     resueltos = serializers.IntegerField()
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Serializer personalizado para incluir información del usuario en el token"""
+    
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        
+        # Agregar información personalizada al token
+        token['username'] = user.username
+        token['tipo'] = user.tipo
+        token['email'] = user.email
+        
+        return token
+    
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        
+        # Agregar información del usuario a la respuesta
+        data['user'] = {
+            'id': self.user.id,
+            'username': self.user.username,
+            'email': self.user.email,
+            'tipo': self.user.tipo,
+            'first_name': self.user.first_name,
+            'last_name': self.user.last_name,
+        }
+        
+        return data
 

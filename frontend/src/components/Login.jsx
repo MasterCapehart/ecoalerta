@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_ENDPOINTS } from '../config'
+import { saveAuthData } from '../services/auth'
 import './Login.css'
 import logo from '../assets/images/logo-green.png'
 
@@ -8,14 +9,16 @@ function Login() {
   const [usuario, setUsuario] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
 
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
+    setError('')
     
     try {
-      const response = await fetch(API_ENDPOINTS.LOGIN, {
+      const response = await fetch(API_ENDPOINTS.JWT_LOGIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -25,16 +28,21 @@ function Login() {
 
       const data = await response.json()
 
-      if (data.success) {
-        // Guardar datos del usuario en localStorage
-        localStorage.setItem('user', JSON.stringify(data.user))
-        navigate('/dashboard')
+      if (response.ok && data.access && data.user) {
+        // Verificar que el usuario sea inspector o admin
+        if (data.user.tipo === 'inspector' || data.user.tipo === 'admin') {
+          // Guardar tokens y datos del usuario
+          saveAuthData(data.access, data.refresh, data.user)
+          navigate('/dashboard')
+        } else {
+          setError('No tienes permisos para acceder. Solo inspectores y administradores pueden acceder.')
+        }
       } else {
-        alert(data.error || 'Credenciales incorrectas')
+        setError(data.detail || data.error || 'Credenciales incorrectas')
       }
     } catch (error) {
       console.error('Error al conectar con el servidor:', error)
-      alert('Error al conectar con el servidor. Verifica que el backend esté corriendo.')
+      setError('Error al conectar con el servidor. Verifica que el backend esté corriendo.')
     } finally {
       setLoading(false)
     }
@@ -71,6 +79,18 @@ function Login() {
             />
           </div>
 
+          {error && (
+            <div style={{
+              color: '#ff6b6b',
+              fontSize: '14px',
+              marginBottom: '10px',
+              padding: '10px',
+              backgroundColor: '#ffe0e0',
+              borderRadius: '4px'
+            }}>
+              {error}
+            </div>
+          )}
           <button type="submit" className="btn-login" disabled={loading}>
             {loading ? 'Conectando...' : 'Iniciar Sesión'}
           </button>
