@@ -5,7 +5,6 @@ Django settings for ecoalerta project.
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-from datetime import timedelta
 
 # Cargar variables de entorno
 load_dotenv()
@@ -41,8 +40,6 @@ INSTALLED_APPS = [
 # Agregar el resto de las apps
 INSTALLED_APPS.extend([
     'rest_framework',
-    'rest_framework_simplejwt',  # JWT Authentication
-    'drf_spectacular',  # API Documentation (Swagger/OpenAPI)
     'corsheaders',  # CORS support
     'whitenoise.runserver_nostatic',  # WhiteNoise para servir archivos estáticos
     'reportes',
@@ -163,11 +160,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',  # Requerir autenticación por defecto
+        'rest_framework.permissions.AllowAny',
     ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',  # JWT Authentication
-    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    # Desactivar autenticación por defecto para API pública
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
@@ -176,8 +172,6 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.FormParser',
         'rest_framework.parsers.MultiPartParser',
     ],
-    # Configuración de documentación API
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # CORS settings
@@ -192,8 +186,8 @@ azure_frontend_url = os.getenv('AZURE_FRONTEND_URL', '')
 if azure_frontend_url:
     CORS_ALLOWED_ORIGINS.append(azure_frontend_url)
 
-# Permitir todos los orígenes temporalmente para debugging (cambiar a False en producción)
-CORS_ALLOW_ALL_ORIGINS = True  # Temporalmente True para solucionar problemas de CORS
+# Permitir todos los orígenes de Azure Static Web Apps (temporal para debugging)
+CORS_ALLOW_ALL_ORIGINS = False  # Mantener False para seguridad
 CORS_ALLOW_CREDENTIALS = True
 
 # Configuración adicional de CORS para evitar problemas
@@ -266,42 +260,3 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
-
-# Configuración de Simple JWT
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),  # Token de acceso válido por 1 hora
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),  # Token de refresco válido por 7 días
-    'ROTATE_REFRESH_TOKENS': True,  # Rotar refresh tokens en cada uso
-    'BLACKLIST_AFTER_ROTATION': True,  # Añadir tokens antiguos a blacklist
-    'UPDATE_LAST_LOGIN': True,
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
-    'TOKEN_TYPE_CLAIM': 'token_type',
-}
-
-# Configuración de drf-spectacular (Swagger/OpenAPI)
-SPECTACULAR_SETTINGS = {
-    'TITLE': 'EcoAlerta API',
-    'DESCRIPTION': 'API para el sistema de monitoreo y reporte de vertederos ilegales',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'COMPONENT_SPLIT_REQUEST': True,
-    'SCHEMA_PATH_PREFIX': '/api/',
-    'AUTHENTICATION_WHITELIST': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
-    'SWAGGER_UI_SETTINGS': {
-        'deepLinking': True,
-        'displayOperationId': False,
-        'defaultModelsExpandDepth': 2,
-        'defaultModelExpandDepth': 2,
-        'docExpansion': 'none',
-        'filter': True,
-    },
-}
-

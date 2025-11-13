@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_ENDPOINTS } from '../config'
-import { saveAuthData } from '../services/auth'
 import './Login.css'
 import logo from '../assets/images/logo-green.png'
 
@@ -9,85 +8,13 @@ function Login() {
   const [usuario, setUsuario] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const navigate = useNavigate()
 
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
     
-    // Intentar primero con JWT, si falla usar login antiguo como fallback
     try {
-      console.log('Intentando conectar a:', API_ENDPOINTS.JWT_LOGIN)
-      
-      // Timeout de 10 segundos
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000)
-      
-      const response = await fetch(API_ENDPOINTS.JWT_LOGIN, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username: usuario, password: password }),
-        signal: controller.signal
-      })
-      
-      clearTimeout(timeoutId)
-
-      console.log('Respuesta recibida:', response.status, response.statusText)
-
-      // Intentar parsear JSON
-      let data
-      try {
-        data = await response.json()
-      } catch (jsonError) {
-        const text = await response.text()
-        console.error('Error parseando JSON:', text)
-        // Si falla JWT, intentar login antiguo
-        return await tryLegacyLogin()
-      }
-
-      if (response.ok && data.access && data.user) {
-        // Verificar que el usuario sea inspector o admin
-        if (data.user.tipo === 'inspector' || data.user.tipo === 'admin') {
-          // Guardar tokens y datos del usuario
-          saveAuthData(data.access, data.refresh, data.user)
-          navigate('/dashboard')
-          return
-        } else {
-          setError('No tienes permisos para acceder. Solo inspectores y administradores pueden acceder.')
-          return
-        }
-      } else {
-        // Si JWT falla, intentar login antiguo
-        if (response.status >= 500 || response.status === 0) {
-          return await tryLegacyLogin()
-        }
-        // Mejor manejo de errores de autenticación
-        if (response.status === 401) {
-          setError(data.detail || data.error || 'Credenciales incorrectas')
-        } else {
-          setError(data.detail || data.error || `Error (${response.status}): ${response.statusText}`)
-        }
-      }
-    } catch (error) {
-      console.error('Error al conectar con JWT:', error)
-      // Si falla completamente, intentar login antiguo
-      if (error.name === 'AbortError' || error.name === 'TypeError') {
-        return await tryLegacyLogin()
-      }
-      setError(`Error de conexión: ${error.message}`)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Función de fallback al login antiguo
-  const tryLegacyLogin = async () => {
-    try {
-      console.log('Intentando login antiguo como fallback...')
       const response = await fetch(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: {
@@ -99,17 +26,17 @@ function Login() {
       const data = await response.json()
 
       if (data.success) {
-        // Guardar datos del usuario (sin JWT)
+        // Guardar datos del usuario en localStorage
         localStorage.setItem('user', JSON.stringify(data.user))
-        // Simular token para compatibilidad
-        localStorage.setItem('access_token', 'legacy-auth')
         navigate('/dashboard')
       } else {
-        setError(data.error || 'Credenciales incorrectas')
+        alert(data.error || 'Credenciales incorrectas')
       }
     } catch (error) {
-      console.error('Error en login antiguo:', error)
-      setError('No se pudo conectar al servidor. Verifica que el backend esté corriendo.')
+      console.error('Error al conectar con el servidor:', error)
+      alert('Error al conectar con el servidor. Verifica que el backend esté corriendo.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -144,18 +71,6 @@ function Login() {
             />
           </div>
 
-          {error && (
-            <div style={{
-              color: '#ff6b6b',
-              fontSize: '14px',
-              marginBottom: '10px',
-              padding: '10px',
-              backgroundColor: '#ffe0e0',
-              borderRadius: '4px'
-            }}>
-              {error}
-            </div>
-          )}
           <button type="submit" className="btn-login" disabled={loading}>
             {loading ? 'Conectando...' : 'Iniciar Sesión'}
           </button>
