@@ -28,13 +28,22 @@ fi
 # apt-get install -y -qq gdal-bin libgdal-dev libgeos-dev libproj-dev 2>&1 | head -5 || echo "⚠️ No se pudo instalar GDAL/GEOS (continuando)"
 
 # Crear o activar entorno virtual
-if [ ! -d "antenv" ]; then
+# Verificar si el entorno virtual existe Y es válido
+if [ ! -d "antenv" ] || [ ! -f "antenv/bin/activate" ]; then
+    # Si existe pero está corrupto, eliminarlo
+    if [ -d "antenv" ]; then
+        echo "⚠️ Entorno virtual corrupto, eliminándolo..."
+        rm -rf antenv
+    fi
     echo "Creando entorno virtual..."
     python3.11 -m venv antenv || {
         echo "❌ ERROR: No se pudo crear entorno virtual"
         exit 1
     }
-    source antenv/bin/activate
+    source antenv/bin/activate || {
+        echo "❌ ERROR: No se pudo activar entorno virtual recién creado"
+        exit 1
+    }
     pip install --upgrade pip --quiet 2>&1 | tail -3
     echo "Instalando dependencias..."
     pip install -r requirements.txt 2>&1 | tail -10 || {
@@ -44,8 +53,22 @@ if [ ! -d "antenv" ]; then
 else
     echo "Activando entorno virtual existente..."
     source antenv/bin/activate || {
-        echo "❌ ERROR: No se pudo activar entorno virtual"
-        exit 1
+        echo "⚠️ No se pudo activar entorno virtual existente, recreándolo..."
+        rm -rf antenv
+        python3.11 -m venv antenv || {
+            echo "❌ ERROR: No se pudo recrear entorno virtual"
+            exit 1
+        }
+        source antenv/bin/activate || {
+            echo "❌ ERROR: No se pudo activar entorno virtual recién recreado"
+            exit 1
+        }
+        pip install --upgrade pip --quiet 2>&1 | tail -3
+        echo "Instalando dependencias en entorno virtual recreado..."
+        pip install -r requirements.txt 2>&1 | tail -10 || {
+            echo "⚠️ ERROR instalando dependencias"
+            exit 1
+        }
     }
     # Forzar actualización de dependencias para asegurar que todas estén instaladas
     echo "Actualizando dependencias..."
