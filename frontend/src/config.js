@@ -4,7 +4,14 @@ const isProduction = window.location.hostname !== 'localhost' && window.location
 const PRODUCTION_API_URL = 'https://ecoalerta-backend-cmfbgrb3bgd0ephd.chilecentral-01.azurewebsites.net';
 const DEVELOPMENT_API_URL = 'http://localhost:8000';
 
-export const API_URL = import.meta.env.VITE_API_URL || (isProduction ? PRODUCTION_API_URL : DEVELOPMENT_API_URL);
+// Validar y limpiar la URL de la variable de entorno si existe
+let envApiUrl = import.meta.env.VITE_API_URL;
+if (envApiUrl) {
+  // Limpiar cualquier carácter inválido y asegurar que termine sin barra
+  envApiUrl = envApiUrl.trim().replace(/[=]+/g, '-').replace(/\/+$/, '');
+}
+
+export const API_URL = envApiUrl || (isProduction ? PRODUCTION_API_URL : DEVELOPMENT_API_URL);
 
 export const API_ENDPOINTS = {
   LOGIN: `${API_URL}/api/auth/login/`,
