@@ -33,5 +33,6 @@ urlpatterns = [
 ]
 
 # Servir archivos media (tanto en desarrollo como en producción para Azure)
-# En producción idealmente se usaría Azure Blob Storage, pero por ahora Django los sirve
+# En Azure App Service, Django puede servir archivos media directamente
+# NOTA: Para producción a gran escala, considera usar Azure Blob Storage
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
