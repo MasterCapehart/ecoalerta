@@ -28,11 +28,19 @@ fi
 # apt-get install -y -qq gdal-bin libgdal-dev libgeos-dev libproj-dev 2>&1 | head -5 || echo "⚠️ No se pudo instalar GDAL/GEOS (continuando)"
 
 # Crear o activar entorno virtual
-# Verificar si el entorno virtual existe Y es válido
-if [ ! -d "antenv" ] || [ ! -f "antenv/bin/activate" ]; then
-    # Si existe pero está corrupto, eliminarlo
+# Verificar si el entorno virtual existe Y es válido (tiene bin/activate y bin/python)
+VENV_VALID=false
+if [ -d "antenv" ] && [ -f "antenv/bin/activate" ] && [ -f "antenv/bin/python" ]; then
+    # Intentar activar para verificar que funciona
+    if source antenv/bin/activate 2>/dev/null && python --version >/dev/null 2>&1; then
+        VENV_VALID=true
+    fi
+fi
+
+if [ "$VENV_VALID" = false ]; then
+    # Si existe pero está corrupto o vacío, eliminarlo
     if [ -d "antenv" ]; then
-        echo "⚠️ Entorno virtual corrupto, eliminándolo..."
+        echo "⚠️ Entorno virtual corrupto o vacío, eliminándolo..."
         rm -rf antenv
     fi
     echo "Creando entorno virtual..."
