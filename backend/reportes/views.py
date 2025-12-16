@@ -66,6 +66,12 @@ class ReporteViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-fecha_creacion')
     
     def create(self, request, *args, **kwargs):
+        # Log para debugging
+        print(f"📸 Creando reporte - Foto recibida: {request.FILES.get('foto')}")
+        if request.FILES.get('foto'):
+            print(f"   Nombre del archivo: {request.FILES['foto'].name}")
+            print(f"   Tamaño: {request.FILES['foto'].size} bytes")
+        
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         
@@ -81,6 +87,13 @@ class ReporteViewSet(viewsets.ModelViewSet):
         
         # Crear el objeto con la ubicación geográfica
         reporte = serializer.save()
+        
+        # Log después de guardar
+        if reporte.foto:
+            print(f"✅ Foto guardada: {reporte.foto.name}")
+            print(f"   Ruta completa: {reporte.foto.path}")
+        else:
+            print("⚠️ ADVERTENCIA: No se guardó la foto")
         
         return Response({
             'codigo_seguimiento': reporte.codigo_seguimiento,

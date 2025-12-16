@@ -147,7 +147,11 @@ echo "Creando carpeta media si no existe..."
 mkdir -p media/reportes || {
     echo "⚠️ ADVERTENCIA: No se pudo crear carpeta media (continuando)"
 }
-echo "Carpeta media creada/verificada"
+# Asegurar permisos de escritura
+chmod -R 777 media || {
+    echo "⚠️ ADVERTENCIA: No se pudieron establecer permisos en media (continuando)"
+}
+echo "Carpeta media creada/verificada con permisos de escritura"
 
 # Recopilar archivos estáticos (continuar aunque falle)
 echo "Recopilando archivos estáticos..."
