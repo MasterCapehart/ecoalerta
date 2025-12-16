@@ -88,6 +88,8 @@ WSGI_APPLICATION = 'ecoalerta.wsgi.application'
 # Azure PostgreSQL - Usando PostgreSQL estándar (NO PostGIS)
 # IMPORTANTE: Forzar ENGINE explícitamente como PostgreSQL estándar
 # Aunque instalamos GDAL/GEOS, NO usamos PostGIS para evitar problemas
+USE_SQLITE_LOCAL = os.getenv('USE_SQLITE_LOCAL', 'false').lower() in ('1', 'true', 'yes')
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',  # PostgreSQL estándar, NO PostGIS
@@ -102,8 +104,14 @@ DATABASES = {
     }
 }
 
+if USE_SQLITE_LOCAL:
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+}
+
 # Validar que el ENGINE sea correcto (forzar PostgreSQL estándar)
-if DATABASES['default']['ENGINE'] != 'django.db.backends.postgresql':
+if not USE_SQLITE_LOCAL and DATABASES['default']['ENGINE'] != 'django.db.backends.postgresql':
     # Si por alguna razón el ENGINE no es PostgreSQL estándar, forzarlo
     print(f"⚠️ ADVERTENCIA: ENGINE no es PostgreSQL estándar: {DATABASES['default']['ENGINE']}")
     print("   Forzando a django.db.backends.postgresql")

@@ -4,9 +4,10 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate
+import os
+
+from django.conf import settings
 from django.db.models import Count, Q
-# NO usar GeoDjango - causa errores con GDAL en Azure
-from django.db import connection
 
 from .models import Reporte, CategoriaResiduo, Usuario
 from .serializers import (
@@ -14,7 +15,16 @@ from .serializers import (
     ReporteDetalleSerializer,
     CategoriaResiduoSerializer,
     LoginSerializer,
-    EstadisticasSerializer
+    EstadisticasSerializer,
+    ReportePredictionRequestSerializer,
+    ReportePredictionResponseSerializer,
+)
+from .ml import ReportResolutionPredictor
+from .ml.exceptions import PredictionModelNotFound, PredictionModelNotReady
+
+LOCAL_PREDICTIONS_ENABLED = (
+    settings.DEBUG
+    or os.getenv("ENABLE_LOCAL_PREDICTIONS", "false").lower() in ("1", "true", "yes")
 )
 
 
@@ -30,6 +40,12 @@ class ReporteViewSet(viewsets.ModelViewSet):
         if self.action == 'retrieve':
             return ReporteDetalleSerializer
         return ReporteSerializer
+    
+    def get_serializer_context(self):
+        """Asegurar que el request siempre esté en el contexto del serializer"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
     
     def get_queryset(self):
         queryset = Reporte.objects.select_related('categoria', 'asignado_a')
@@ -104,6 +120,37 @@ class ReporteViewSet(viewsets.ModelViewSet):
         }
         
         return Response(data)
+    
+    @action(detail=False, methods=['post'], url_path='predicciones')
+    def predicciones(self, request):
+        """Generar predicciones de resolución usando el modelo local."""
+        if not LOCAL_PREDICTIONS_ENABLED:
+            return Response(
+                {
+                    'detail': 'Las predicciones solo están disponibles en entornos locales.',
+                    'enabled': False,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+        
+        serializer = ReportePredictionRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.to_feature_payload()
+        
+        try:
+            predictor = ReportResolutionPredictor.load()
+            result = predictor.predict_from_payload(payload)
+        except PredictionModelNotFound:
+            try:
+                predictor = ReportResolutionPredictor.train_from_queryset()
+                result = predictor.predict_from_payload(payload)
+            except PredictionModelNotReady:
+                result = ReportResolutionPredictor.fallback_prediction(payload)
+        except PredictionModelNotReady:
+            result = ReportResolutionPredictor.fallback_prediction(payload)
+        
+        response_serializer = ReportePredictionResponseSerializer(result.as_dict())
+        return Response(response_serializer.data)
 
 
 class CategoriaResiduoViewSet(viewsets.ReadOnlyModelViewSet):

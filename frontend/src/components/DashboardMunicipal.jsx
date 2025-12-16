@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './DashboardMunicipal.css'
 import { API_ENDPOINTS } from '../config'
+import { API_URL } from '../config'
+import { fetchCategorias as fetchCategoriasService, requestPrediction } from '../services/predictions'
 
 // Fix iconos Leaflet
 import L from 'leaflet'
@@ -259,12 +261,58 @@ function DashboardMunicipal() {
   const [heatmapEnabled, setHeatmapEnabled] = useState(false)
   const [heatmapData, setHeatmapData] = useState([])
   const [loadingHeatmap, setLoadingHeatmap] = useState(false)
+  const [categorias, setCategorias] = useState([])
+  const [predictionForm, setPredictionForm] = useState({
+    categoria: '',
+    estado: 'nuevo',
+    lat: '',
+    lng: '',
+    descripcion: '',
+    tieneFoto: false,
+    dias_abierto: '',
+  })
+  const [predictionResult, setPredictionResult] = useState(null)
+  const [predictionLoading, setPredictionLoading] = useState(false)
+  const [predictionError, setPredictionError] = useState('')
+  const [predictionsEnabled, setPredictionsEnabled] = useState(true)
+  const predictedReportes = useMemo(
+    () => reportes.filter((reporte) => Boolean(reporte.prediction)),
+    [reportes]
+  )
+  const highRiskReportes = useMemo(() => {
+    return predictedReportes
+      .filter((reporte) => reporte.prediction?.risk_level === 'alto')
+      .sort((a, b) => (b.prediction?.probability || 0) - (a.prediction?.probability || 0))
+      .slice(0, 5)
+  }, [predictedReportes])
+  const predictionSummary = useMemo(() => {
+    const summary = { alto: 0, medio: 0, bajo: 0 }
+    predictedReportes.forEach((reporte) => {
+      if (reporte.prediction?.risk_level && summary[reporte.prediction.risk_level] !== undefined) {
+        summary[reporte.prediction.risk_level] += 1
+      }
+    })
+    return summary
+  }, [predictedReportes])
+  const predictionsAvailable = predictedReportes.length > 0
 
   // Cargar reportes y estadísticas
   useEffect(() => {
     fetchReportes()
     fetchEstadisticas()
   }, [filtroEstado])
+
+  useEffect(() => {
+    const loadCategorias = async () => {
+      try {
+        const data = await fetchCategoriasService()
+        setCategorias(Array.isArray(data) ? data : [])
+      } catch (error) {
+        console.error('Error al cargar categorías:', error)
+      }
+    }
+    loadCategorias()
+  }, [])
 
   // Cargar datos del heatmap cuando se activa
   useEffect(() => {
@@ -339,6 +387,64 @@ function DashboardMunicipal() {
     }
   }
 
+  const handlePredictionChange = (field, value) => {
+    setPredictionForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  const handlePredictionSubmit = async (event) => {
+    event.preventDefault()
+    setPredictionError('')
+    setPredictionResult(null)
+
+    const lat = parseFloat(predictionForm.lat)
+    const lng = parseFloat(predictionForm.lng)
+
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      setPredictionError('Debes ingresar valores numéricos para latitud y longitud.')
+      return
+    }
+
+    const dias = predictionForm.dias_abierto ? parseFloat(predictionForm.dias_abierto) : undefined
+    if (dias !== undefined && Number.isNaN(dias)) {
+      setPredictionError('Los días abiertos deben ser un número válido.')
+      return
+    }
+
+    const payload = {
+      categoria: predictionForm.categoria ? Number(predictionForm.categoria) : null,
+      estado: predictionForm.estado,
+      lat,
+      lng,
+      descripcion: predictionForm.descripcion,
+      tiene_foto: predictionForm.tieneFoto,
+    }
+    if (dias !== undefined) {
+      payload.dias_abierto = dias
+    }
+
+    try {
+      setPredictionLoading(true)
+      const result = await requestPrediction(payload)
+      setPredictionResult(result)
+      setPredictionsEnabled(true)
+    } catch (error) {
+      console.error('Error al solicitar predicción:', error)
+      if (error.status === 503) {
+        setPredictionsEnabled(false)
+        setPredictionError(
+          'El servicio de predicciones solo está disponible en entornos locales con el modelo entrenado.'
+        )
+      } else {
+        setPredictionError(error.message || 'Ocurrió un error al generar la predicción.')
+      }
+    } finally {
+      setPredictionLoading(false)
+    }
+  }
+
   const fetchReportes = async () => {
     setLoading(true)
     try {
@@ -363,9 +469,32 @@ function DashboardMunicipal() {
     }
   }
 
-  const handleVerDetalle = (reporte) => {
+  const handleVerDetalle = async (reporte) => {
     console.log('handleVerDetalle llamado con:', reporte)
-    setReporteSeleccionado(reporte)
+    console.log('Campo foto del reporte (inicial):', reporte.foto)
+    console.log('API_URL:', API_URL)
+    
+    // Siempre obtener el detalle completo del reporte para asegurar que tenemos todos los datos
+    if (reporte.id) {
+      try {
+        console.log('Obteniendo detalle completo del reporte desde:', `${API_ENDPOINTS.REPORTES}${reporte.id}/`)
+        const response = await fetch(`${API_ENDPOINTS.REPORTES}${reporte.id}/`)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        const reporteCompleto = await response.json()
+        console.log('Reporte completo obtenido:', reporteCompleto)
+        console.log('Foto del reporte completo:', reporteCompleto.foto)
+        setReporteSeleccionado(reporteCompleto)
+      } catch (error) {
+        console.error('Error al obtener detalle del reporte:', error)
+        // Si falla, usar el reporte de la lista
+        setReporteSeleccionado(reporte)
+      }
+    } else {
+      setReporteSeleccionado(reporte)
+    }
+    
     setShowModal(true)
     console.log('Modal debería mostrarse ahora')
   }
@@ -545,6 +674,12 @@ function DashboardMunicipal() {
                           <b>{reporte.codigo_seguimiento}</b><br/>
                           {reporte.categoria_nombre}<br/>
                           <small>{reporte.direccion || 'Sin dirección'}</small><br/>
+                        {reporte.prediction && (
+                          <div className={`risk-chip risk-${reporte.prediction.risk_level}`}>
+                            Riesgo {reporte.prediction.risk_level.toUpperCase()} ·{' '}
+                            {(reporte.prediction.probability * 100).toFixed(0)}%
+                          </div>
+                        )}
                           <button 
                             onClick={() => handleVerDetalle(reporte)}
                             style={{
@@ -578,6 +713,7 @@ function DashboardMunicipal() {
                     <th>Fecha</th>
                     <th>Ubicación</th>
                     <th>Categoría</th>
+                    <th>Riesgo</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                   </tr>
@@ -602,6 +738,16 @@ function DashboardMunicipal() {
                         <td>{new Date(reporte.fecha_creacion).toLocaleDateString()}</td>
                         <td>{reporte.direccion || 'Sin dirección'}</td>
                         <td>{reporte.categoria_nombre || 'Sin categoría'}</td>
+                      <td>
+                        {reporte.prediction ? (
+                          <span className={`risk-badge risk-${reporte.prediction.risk_level}`}>
+                            {(reporte.prediction.probability * 100).toFixed(0)}% ·{' '}
+                            {reporte.prediction.risk_level.toUpperCase()}
+                          </span>
+                        ) : (
+                          <span className="risk-badge risk-empty">Sin datos</span>
+                        )}
+                      </td>
                         <td>
                           <span className={`status-badge status-${reporte.estado}`}>
                             {reporte.estado.toUpperCase()}
@@ -626,6 +772,222 @@ function DashboardMunicipal() {
                   )}
                 </tbody>
               </table>
+            </div>
+          )}
+          
+          {/* Vista Estadísticas + Predicciones */}
+          {vistaActual === 'estadisticas' && (
+            <div className="prediction-panel">
+              <div className="prediction-card prediction-card--auto">
+                <div className="prediction-card__header">
+                  <div>
+                    <h3>🔎 Puntos críticos automáticos</h3>
+                    <p>El modelo analiza todos los reportes y resalta los de mayor prioridad.</p>
+                  </div>
+                  <span className={`prediction-badge ${predictionsAvailable ? 'success' : 'warning'}`}>
+                    {predictionsAvailable ? 'Modelo activo' : 'Sin datos predictivos'}
+                  </span>
+                </div>
+
+                {predictionsAvailable ? (
+                  <>
+                    <div className="prediction-metrics">
+                      <div className="metric-card risk-alto">
+                        <span>Riesgo alto</span>
+                        <strong>{predictionSummary.alto}</strong>
+                      </div>
+                      <div className="metric-card risk-medio">
+                        <span>Riesgo medio</span>
+                        <strong>{predictionSummary.medio}</strong>
+                      </div>
+                      <div className="metric-card risk-bajo">
+                        <span>Riesgo bajo</span>
+                        <strong>{predictionSummary.bajo}</strong>
+                      </div>
+                    </div>
+                    <div className="prediction-meta">
+                      <p>Top 5 reportes que conviene revisar primero:</p>
+                    </div>
+                    <ul className="prediction-list">
+                      {highRiskReportes.length === 0 && (
+                        <li className="prediction-list__item muted">
+                          No hay reportes críticos en este momento. Revisa los de riesgo medio.
+                        </li>
+                      )}
+                      {highRiskReportes.map((reporte) => (
+                        <li key={reporte.id} className="prediction-list__item">
+                          <div>
+                            <strong>{reporte.codigo_seguimiento}</strong>
+                            <p>
+                              {reporte.categoria_nombre} ·{' '}
+                              {(reporte.prediction.probability * 100).toFixed(0)}% de resolución ·{' '}
+                              {reporte.prediction.estimated_resolution_days} días estimados
+                            </p>
+                          </div>
+                          <span className={`risk-badge risk-${reporte.prediction.risk_level}`}>
+                            {reporte.prediction.risk_level.toUpperCase()}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <div className="prediction-placeholder">
+                    <p>Aún no hay predicciones calculadas automáticamente.</p>
+                    <ul>
+                      <li>Ejecuta `python manage.py train_prediction_model` para activar el modelo.</li>
+                      <li>Asegúrate de tener reportes con coordenadas y categorías.</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="prediction-card">
+                <div className="prediction-card__header">
+                  <div>
+                    <h3>🧪 Simular escenario (opcional)</h3>
+                    <p>Si necesitas probar variaciones manuales, completa este formulario.</p>
+                  </div>
+                  {!predictionsEnabled && (
+                    <span className="prediction-badge warning">Solo disponible en local</span>
+                  )}
+                </div>
+
+                <form className="prediction-form" onSubmit={handlePredictionSubmit}>
+                  <div className="form-row">
+                    <label>Categoría</label>
+                    <select
+                      value={predictionForm.categoria}
+                      onChange={(e) => handlePredictionChange('categoria', e.target.value)}
+                    >
+                      <option value="">Selecciona una categoría</option>
+                      {categorias.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-row">
+                    <label>Descripción (opcional)</label>
+                    <textarea
+                      rows="3"
+                      placeholder="Resumen del reporte..."
+                      value={predictionForm.descripcion}
+                      onChange={(e) => handlePredictionChange('descripcion', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-row form-row--inline">
+                    <div>
+                      <label>Latitud *</label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        placeholder="-33.45"
+                        value={predictionForm.lat}
+                        onChange={(e) => handlePredictionChange('lat', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label>Longitud *</label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        placeholder="-70.66"
+                        value={predictionForm.lng}
+                        onChange={(e) => handlePredictionChange('lng', e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row form-row--inline">
+                    <div>
+                      <label>Estado actual</label>
+                      <select
+                        value={predictionForm.estado}
+                        onChange={(e) => handlePredictionChange('estado', e.target.value)}
+                      >
+                        <option value="nuevo">Nuevo</option>
+                        <option value="proceso">En Proceso</option>
+                        <option value="resuelto">Resuelto</option>
+                        <option value="cerrado">Cerrado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Días abiertos (opcional)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={predictionForm.dias_abierto}
+                        onChange={(e) => handlePredictionChange('dias_abierto', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={predictionForm.tieneFoto}
+                      onChange={(e) => handlePredictionChange('tieneFoto', e.target.checked)}
+                    />
+                    Existe evidencia fotográfica
+                  </label>
+
+                  {predictionError && <p className="error-text">{predictionError}</p>}
+
+                  <button
+                    className="btn-predict"
+                    type="submit"
+                    disabled={predictionLoading || !predictionsEnabled}
+                  >
+                    {predictionLoading ? 'Calculando...' : 'Generar predicción'}
+                  </button>
+                </form>
+
+                <div className="prediction-inline-result">
+                  {predictionResult ? (
+                    <>
+                      <div className="prediction-metrics">
+                        <div className="metric-card">
+                          <span>Probabilidad</span>
+                          <strong>{(predictionResult.probability * 100).toFixed(1)}%</strong>
+                        </div>
+                        <div className="metric-card">
+                          <span>Tiempo estimado</span>
+                          <strong>{predictionResult.estimated_resolution_days} días</strong>
+                        </div>
+                        <div className={`metric-card risk-${predictionResult.risk_level}`}>
+                          <span>Nivel de riesgo</span>
+                          <strong>{predictionResult.risk_level.toUpperCase()}</strong>
+                        </div>
+                      </div>
+                      <div className="prediction-meta">
+                        <p>
+                          Fuente:{' '}
+                          {predictionResult.source === 'ml-model'
+                            ? 'Modelo ML entrenado localmente'
+                            : 'Heurística basada en datos históricos'}
+                        </p>
+                        <p>
+                          Muestras usadas: {predictionResult.metadata?.num_samples || 'N/D'} · Tasa de resolución:{' '}
+                          {predictionResult.metadata?.resolved_rate
+                            ? `${(predictionResult.metadata.resolved_rate * 100).toFixed(1)}%`
+                            : 'N/D'}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="prediction-placeholder">
+                      <p>Simula un escenario para ver los detalles aquí.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           
@@ -676,6 +1038,85 @@ function DashboardMunicipal() {
               <label>Descripción</label>
               <p>{reporteSeleccionado.descripcion || 'Sin descripción'}</p>
             </div>
+
+            {/* Agregar visualización de imagen */}
+            {reporteSeleccionado.foto ? (
+              <div className="detail-group">
+                <label>Fotografía</label>
+                <div className="reporte-imagen-container">
+                  {(() => {
+                    let imagenUrl = reporteSeleccionado.foto;
+                    
+                    // Si no es una URL completa, construirla
+                    if (!imagenUrl.startsWith('http://') && !imagenUrl.startsWith('https://')) {
+                      // Si empieza con /media/, usar directamente con API_URL
+                      if (imagenUrl.startsWith('/media/')) {
+                        imagenUrl = `${API_URL}${imagenUrl}`;
+                      } 
+                      // Si es una ruta relativa como "reportes/image.jpg"
+                      else if (!imagenUrl.startsWith('/')) {
+                        imagenUrl = `${API_URL}/media/${imagenUrl}`;
+                      }
+                      // Si empieza con / pero no con /media/
+                      else {
+                        imagenUrl = `${API_URL}${imagenUrl}`;
+                      }
+                    }
+                    
+                    console.log('URL de imagen construida:', imagenUrl);
+                    
+                    return (
+                      <div>
+                        <img 
+                          src={imagenUrl}
+                          alt={`Reporte ${reporteSeleccionado.codigo_seguimiento}`}
+                          className="reporte-imagen"
+                          onError={(e) => {
+                            console.error('Error al cargar imagen:', e.target.src);
+                            console.error('Reporte completo:', reporteSeleccionado);
+                            e.target.style.display = 'none';
+                            const errorMsg = document.getElementById(`error-${reporteSeleccionado.id}`);
+                            if (errorMsg) {
+                              errorMsg.style.display = 'block';
+                            }
+                          }}
+                          onLoad={() => {
+                            console.log('Imagen cargada exitosamente:', imagenUrl);
+                            const errorMsg = document.getElementById(`error-${reporteSeleccionado.id}`);
+                            if (errorMsg) {
+                              errorMsg.style.display = 'none';
+                            }
+                          }}
+                        />
+                        <p 
+                          id={`error-${reporteSeleccionado.id}`}
+                          className="imagen-error" 
+                          style={{ 
+                            display: 'none', 
+                            color: '#d32f2f', 
+                            fontSize: '14px', 
+                            padding: '10px', 
+                            textAlign: 'center',
+                            backgroundColor: '#ffebee',
+                            borderRadius: '4px',
+                            marginTop: '10px'
+                          }}
+                        >
+                          ⚠️ No se pudo cargar la imagen.<br/>
+                          <small>URL: {imagenUrl}</small><br/>
+                          <small>Verifica que el archivo exista en el servidor.</small>
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            ) : (
+              <div className="detail-group">
+                <label>Fotografía</label>
+                <p style={{ color: '#999', fontStyle: 'italic' }}>No hay imagen disponible para este reporte</p>
+              </div>
+            )}
 
             <div className="form-group">
               <label>Cambiar Estado</label>

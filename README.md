@@ -136,6 +136,37 @@ npm run dev
 - Reportes: `GET/POST /api/reportes/`
 - Categorías: `GET /api/categorias/`
 - Estadísticas: `GET /api/reportes/estadisticas/`
+- Predicciones locales (beta): `POST /api/reportes/predicciones/`
+
+## Predicciones locales con ML (solo desarrollo)
+
+1. **Instala las dependencias nuevas** (ya incluidas en `requirements.txt`): `pip install -r requirements.txt`.
+2. **Entrena el modelo local** usando tus datos reales:
+   ```bash
+   cd backend
+   python manage.py train_prediction_model --min-samples 15
+   ```
+   El modelo se guarda en `reportes/ml/artifacts/`.
+3. **Consume el endpoint local**:
+   ```bash
+   curl -X POST http://localhost:8000/api/reportes/predicciones/ \
+     -H "Content-Type: application/json" \
+     -d '{
+       "categoria": 1,
+       "lat": -33.45,
+       "lng": -70.66,
+       "descripcion": "Residuos en la esquina norte",
+       "tiene_foto": true
+     }'
+   ```
+   La respuesta incluye `probability`, `estimated_resolution_days`, `risk_level` y metadatos del modelo.
+   - En el **Dashboard Municipal → vista “Estadísticas”** verás automáticamente los reportes críticos según el modelo, y (opcional) un formulario para simular escenarios manuales.
+4. **Solo local:** En producción el endpoint responde `503` a menos que definas `ENABLE_LOCAL_PREDICTIONS=1` explícitamente.
+5. **Sin PostgreSQL?** Exporta `USE_SQLITE_LOCAL=1` antes de ejecutar `manage.py` para usar automáticamente `db.sqlite3` durante entrenamiento o pruebas.
+
+### Predicciones en Azure
+
+- Para habilitarlas en App Service (variables, entrenamiento automático, logs) revisa **[docs/ML_AZURE.md](docs/ML_AZURE.md)**.
 
 ## 🚀 Despliegue en Azure con CI/CD
 

@@ -5,6 +5,8 @@ from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
+from django.conf import settings
+from django.conf.urls.static import static
 
 def root_view(request):
     """Vista raíz para evitar bucles de redirección"""
@@ -29,3 +31,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('reportes.urls')),
 ]
+
+# Servir archivos media (tanto en desarrollo como en producción para Azure)
+# En producción idealmente se usaría Azure Blob Storage, pero por ahora Django los sirve
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

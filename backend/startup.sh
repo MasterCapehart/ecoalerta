@@ -83,6 +83,35 @@ python manage.py migrate --noinput 2>&1 | tail -10 || {
     echo "⚠️ ADVERTENCIA: Error en migraciones (continuando)"
 }
 
+to_lower() {
+    echo "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+ENABLE_PREDICTIONS=$(to_lower "${ENABLE_LOCAL_PREDICTIONS:-false}")
+TRAIN_PREDICTIONS=$(to_lower "${TRAIN_PREDICTIONS_ON_START:-false}")
+MIN_SAMPLES=${TRAIN_PREDICTIONS_MIN_SAMPLES:-30}
+
+if [ "$ENABLE_PREDICTIONS" = "true" ] || [ "$ENABLE_PREDICTIONS" = "1" ]; then
+    echo "✅ Predicciones habilitadas (ENABLE_LOCAL_PREDICTIONS=$ENABLE_LOCAL_PREDICTIONS)"
+    if [ "$TRAIN_PREDICTIONS" = "true" ] || [ "$TRAIN_PREDICTIONS" = "1" ]; then
+        echo "Entrenando modelo local antes de iniciar (min muestras: $MIN_SAMPLES)..."
+        python manage.py train_prediction_model --min-samples "$MIN_SAMPLES" 2>&1 | tail -20 || {
+            echo "⚠️ ADVERTENCIA: No se pudo entrenar el modelo (se usará heurística si es necesario)"
+        }
+    else
+        echo "Omitiendo entrenamiento automático (TRAIN_PREDICTIONS_ON_START desactivado)"
+    fi
+else
+    echo "Predicciones deshabilitadas (ENABLE_LOCAL_PREDICTIONS=$ENABLE_LOCAL_PREDICTIONS)"
+fi
+
+# Crear carpeta media si no existe (para almacenar imágenes de reportes)
+echo "Creando carpeta media si no existe..."
+mkdir -p media/reportes || {
+    echo "⚠️ ADVERTENCIA: No se pudo crear carpeta media (continuando)"
+}
+echo "Carpeta media creada/verificada"
+
 # Recopilar archivos estáticos (continuar aunque falle)
 echo "Recopilando archivos estáticos..."
 python manage.py collectstatic --noinput 2>&1 | tail -10 || {
