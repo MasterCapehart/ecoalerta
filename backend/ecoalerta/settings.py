@@ -246,10 +246,10 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
 
 # Configuración de proxy headers para Azure App Service
-# DESACTIVADO completamente - sin SecurityMiddleware no son necesarios y pueden causar problemas
-# USE_X_FORWARDED_HOST = True
-# USE_X_FORWARDED_PORT = True
-# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# Necesarios para que Django detecte HTTPS correctamente cuando está detrás del proxy de Azure
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Desactivar completamente las redirecciones de seguridad
 # Esto evita que SecurityMiddleware redirija requests
