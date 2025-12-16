@@ -47,6 +47,12 @@ else
         echo "❌ ERROR: No se pudo activar entorno virtual"
         exit 1
     }
+    # Forzar actualización de dependencias para asegurar que todas estén instaladas
+    echo "Actualizando dependencias..."
+    pip install --upgrade pip --quiet 2>&1 | tail -3
+    pip install -r requirements.txt --upgrade 2>&1 | tail -10 || {
+        echo "⚠️ ADVERTENCIA: Error al actualizar dependencias (continuando)"
+    }
 fi
 
 echo "Python: $(which python)"
