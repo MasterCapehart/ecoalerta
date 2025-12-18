@@ -180,3 +180,7 @@ exec gunicorn ecoalerta.wsgi:application \
     --log-level debug \
     --capture-output \
     --enable-stdio-inheritance
+
+# Deployment trigger
+
+# Trigger deployment - $(date)

@@ -13,6 +13,7 @@ if (envApiUrl) {
 
 export const API_URL = envApiUrl || (isProduction ? PRODUCTION_API_URL : DEVELOPMENT_API_URL);
 
+// Endpoints completos (para compatibilidad con código existente)
 export const API_ENDPOINTS = {
   LOGIN: `${API_URL}/api/auth/login/`,
   REPORTES: `${API_URL}/api/reportes/`,
@@ -21,3 +22,18 @@ export const API_ENDPOINTS = {
   HEATMAP: `${API_URL}/api/analytics/heatmap/`,
   PREDICCIONES: `${API_URL}/api/reportes/predicciones/`,
 };
+
+// Rutas relativas para usar con apiClient
+export const API_ROUTES = {
+  LOGIN: '/api/auth/login/',
+  REPORTES: '/api/reportes/',
+  CATEGORIAS: '/api/categorias/',
+  ESTADISTICAS: '/api/reportes/estadisticas/',
+  HEATMAP: '/api/analytics/heatmap/',
+  PREDICCIONES: '/api/reportes/predicciones/',
+  HEALTH: '/api/health/',
+};
+
+// Deployment trigger
+
+// Trigger deployment
