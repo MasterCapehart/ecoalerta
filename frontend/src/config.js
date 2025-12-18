@@ -34,6 +34,6 @@ export const API_ROUTES = {
   HEALTH: '/api/health/',
 };
 
-// Deployment trigger
+// Deployment trigger - $(date +%Y%m%d-%H%M%S)
 
 // Trigger deployment

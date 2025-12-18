@@ -181,6 +181,6 @@ exec gunicorn ecoalerta.wsgi:application \
     --capture-output \
     --enable-stdio-inheritance
 
-# Deployment trigger
+# Deployment trigger - $(date +%Y%m%d-%H%M%S)
 
 # Trigger deployment - $(date)
