@@ -94,22 +94,19 @@ class ReporteSerializer(serializers.ModelSerializer):
         if instance.foto and hasattr(instance.foto, 'url'):
             try:
                 request = self.context.get('request')
+                foto_path = instance.foto.url
+                if not foto_path.startswith('/'):
+                    foto_path = f"/{foto_path}"
+                
                 if request:
-                    foto_url = instance.foto.url
-                    if not foto_url.startswith('/'):
-                        foto_url = f"/{foto_url}"
-                    # build_absolute_uri debería usar HTTPS si está configurado correctamente
-                    absolute_url = request.build_absolute_uri(foto_url)
-                    # Forzar HTTPS si la URL original es HTTPS o si estamos en producción
-                    if request.is_secure() or not settings.DEBUG:
+                    # Usar build_absolute_uri que ya debería manejar HTTPS correctamente
+                    absolute_url = request.build_absolute_uri(foto_path)
+                    # Forzar HTTPS en producción (Azure)
+                    if not settings.DEBUG and 'azurewebsites.net' in absolute_url:
                         absolute_url = absolute_url.replace('http://', 'https://', 1)
                     representation['foto'] = absolute_url
                 else:
                     # Si no hay request, construir URL manualmente
-                    foto_path = instance.foto.url
-                    if not foto_path.startswith('/'):
-                        foto_path = f"/{foto_path}"
-                    # En producción, usar HTTPS
                     if not settings.DEBUG:
                         base_url = 'https://ecoalerta-backend-cmfbgrb3bgd0ephd.chilecentral-01.azurewebsites.net'
                     else:
@@ -228,22 +225,19 @@ class ReporteDetalleSerializer(serializers.ModelSerializer):
         if instance.foto and hasattr(instance.foto, 'url'):
             try:
                 request = self.context.get('request')
+                foto_path = instance.foto.url
+                if not foto_path.startswith('/'):
+                    foto_path = f"/{foto_path}"
+                
                 if request:
-                    foto_url = instance.foto.url
-                    if not foto_url.startswith('/'):
-                        foto_url = f"/{foto_url}"
-                    # build_absolute_uri debería usar HTTPS si está configurado correctamente
-                    absolute_url = request.build_absolute_uri(foto_url)
-                    # Forzar HTTPS si la URL original es HTTPS o si estamos en producción
-                    if request.is_secure() or not settings.DEBUG:
+                    # Usar build_absolute_uri que ya debería manejar HTTPS correctamente
+                    absolute_url = request.build_absolute_uri(foto_path)
+                    # Forzar HTTPS en producción (Azure)
+                    if not settings.DEBUG and 'azurewebsites.net' in absolute_url:
                         absolute_url = absolute_url.replace('http://', 'https://', 1)
                     representation['foto'] = absolute_url
                 else:
                     # Si no hay request, construir URL manualmente
-                    foto_path = instance.foto.url
-                    if not foto_path.startswith('/'):
-                        foto_path = f"/{foto_path}"
-                    # En producción, usar HTTPS
                     if not settings.DEBUG:
                         base_url = 'https://ecoalerta-backend-cmfbgrb3bgd0ephd.chilecentral-01.azurewebsites.net'
                     else:

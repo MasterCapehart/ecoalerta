@@ -1,0 +1,137 @@
+.dark-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s;
+  backdrop-filter: blur(10px);
+}
+
+.dark-mode-toggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.dark-mode-toggle.active {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.toggle-icon {
+  font-size: 18px;
+  transition: transform 0.3s;
+}
+
+.dark-mode-toggle:hover .toggle-icon {
+  transform: rotate(20deg);
+}
+
+.toggle-label {
+  font-size: 13px;
+}
+
+/* Dark mode styles */
+:root.dark-mode {
+  --color-bg: #1a1a1a;
+  --color-surface: #2d2d2d;
+  --color-text: #e0e0e0;
+  --color-text-secondary: #b0b0b0;
+  --color-border: #404040;
+}
+
+.dark-mode .dashboard {
+  background: var(--color-bg);
+}
+
+.dark-mode .sidebar {
+  background: var(--color-surface);
+  border-right-color: var(--color-border);
+}
+
+.dark-mode .content {
+  background: var(--color-bg);
+}
+
+.dark-mode .stat-card,
+.dark-mode .filters-bar,
+.dark-mode .map-view,
+.dark-mode .table-view,
+.dark-mode table,
+.dark-mode .modal-content,
+.dark-mode .prediction-card {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.dark-mode .stat-card h3,
+.dark-mode .filter-group label,
+.dark-mode th,
+.dark-mode td,
+.dark-mode .detail-group label,
+.dark-mode .form-group label {
+  color: var(--color-text);
+}
+
+.dark-mode .stat-card h3,
+.dark-mode .filter-group label {
+  color: var(--color-text-secondary);
+}
+
+.dark-mode input,
+.dark-mode select,
+.dark-mode textarea {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.dark-mode input:focus,
+.dark-mode select:focus,
+.dark-mode textarea:focus {
+  background: var(--color-surface);
+}
+
+.dark-mode .login-box,
+.dark-mode .container {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.dark-mode .login-header p,
+.dark-mode .login-footer p {
+  color: var(--color-text-secondary);
+}
+
+.dark-mode .estadisticas-container {
+  background: var(--color-bg);
+}
+
+.dark-mode .chart-section,
+.dark-mode .kpi-card {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.dark-mode .chart-section h3,
+.dark-mode .kpis-section h3 {
+  color: var(--color-text);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dark-mode-toggle {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .toggle-label {
+    display: none;
+  }
+}
+

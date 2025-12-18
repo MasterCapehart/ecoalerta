@@ -143,6 +143,11 @@ class Reporte(models.Model):
             models.Index(fields=['codigo_seguimiento']),
             models.Index(fields=['estado']),
             models.Index(fields=['fecha_creacion']),
+            # Índices compuestos para consultas frecuentes
+            models.Index(fields=['estado', 'fecha_creacion'], name='reporte_estado_fecha_idx'),
+            models.Index(fields=['categoria', 'estado'], name='reporte_categoria_estado_idx'),
+            models.Index(fields=['ubicacion_lat', 'ubicacion_lng'], name='reporte_ubicacion_idx'),
+            models.Index(fields=['asignado_a', 'estado'], name='reporte_asignado_estado_idx'),
         ]
 
 

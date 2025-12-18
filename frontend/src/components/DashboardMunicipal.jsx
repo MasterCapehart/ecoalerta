@@ -2,9 +2,14 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import './DashboardMunicipal.css'
-import { API_ENDPOINTS } from '../config'
+import { API_ROUTES } from '../config'
 import { API_URL } from '../config'
+import apiClient from '../services/api'
 import { fetchCategorias as fetchCategoriasService, requestPrediction } from '../services/predictions'
+import { toast } from './ToastContainer'
+import Skeleton from './Skeleton'
+import AnimatedNumber from './AnimatedNumber'
+import DarkModeToggle from './DarkModeToggle'
 
 // Fix iconos Leaflet
 import L from 'leaflet'
@@ -338,50 +343,33 @@ function DashboardMunicipal() {
   const fetchHeatmapData = async () => {
     setLoadingHeatmap(true)
     try {
-      const params = new URLSearchParams()
+      const params = {}
       if (filtroEstado) {
-        params.append('estado', filtroEstado)
+        params.estado = filtroEstado
       }
       
-      const url = `${API_ENDPOINTS.HEATMAP}?${params.toString()}`
-      console.log('Fetching heatmap data from:', url)
-      const response = await fetch(url)
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('HTTP error response:', response.status, errorText)
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      console.log('Heatmap data received:', data)
+      const response = await apiClient.get(API_ROUTES.HEATMAP, { params })
+      const data = response.data
       
       if (data.data && Array.isArray(data.data)) {
         if (data.data.length > 0) {
           setHeatmapData(data.data)
-          console.log('Heatmap data set, points:', data.data.length)
         } else {
-          console.warn('Heatmap data is empty array')
           setHeatmapData([])
         }
       } else if (Array.isArray(data)) {
-        // Si la respuesta es directamente un array
         if (data.length > 0) {
           setHeatmapData(data)
-          console.log('Heatmap data set (direct array), points:', data.length)
         } else {
-          console.warn('Heatmap data is empty array')
           setHeatmapData([])
         }
       } else {
-        console.warn('No heatmap data found in response:', data)
         setHeatmapData([])
       }
     } catch (error) {
       console.error('Error al cargar datos del heatmap:', error)
       setHeatmapData([])
-      // Mostrar mensaje de error al usuario
-      alert('Error al cargar el mapa de calor. Por favor, intente nuevamente.')
+      toast.error('Error al cargar el mapa de calor. Por favor, intente nuevamente.')
     } finally {
       setLoadingHeatmap(false)
     }
@@ -448,12 +436,13 @@ function DashboardMunicipal() {
   const fetchReportes = async () => {
     setLoading(true)
     try {
-      const url = filtroEstado ? `${API_ENDPOINTS.REPORTES}?estado=${filtroEstado}` : API_ENDPOINTS.REPORTES
-      const response = await fetch(url)
-      const data = await response.json()
+      const params = filtroEstado ? { estado: filtroEstado } : {}
+      const response = await apiClient.get(API_ROUTES.REPORTES, { params })
+      const data = response.data
       setReportes(Array.isArray(data) ? data : data.results || [])
     } catch (error) {
       console.error('Error al cargar reportes:', error)
+      toast.error('Error al cargar los reportes')
     } finally {
       setLoading(false)
     }
@@ -461,42 +450,31 @@ function DashboardMunicipal() {
 
   const fetchEstadisticas = async () => {
     try {
-      const response = await fetch(API_ENDPOINTS.ESTADISTICAS)
-      const data = await response.json()
-      setEstadisticas(data)
+      const response = await apiClient.get(API_ROUTES.ESTADISTICAS)
+      setEstadisticas(response.data)
     } catch (error) {
       console.error('Error al cargar estadísticas:', error)
+      toast.error('Error al cargar las estadísticas')
     }
   }
 
   const handleVerDetalle = async (reporte) => {
-    console.log('handleVerDetalle llamado con:', reporte)
-    console.log('Campo foto del reporte (inicial):', reporte.foto)
-    console.log('API_URL:', API_URL)
-    
     // Siempre obtener el detalle completo del reporte para asegurar que tenemos todos los datos
     if (reporte.id) {
       try {
-        console.log('Obteniendo detalle completo del reporte desde:', `${API_ENDPOINTS.REPORTES}${reporte.id}/`)
-        const response = await fetch(`${API_ENDPOINTS.REPORTES}${reporte.id}/`)
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        const reporteCompleto = await response.json()
-        console.log('Reporte completo obtenido:', reporteCompleto)
-        console.log('Foto del reporte completo:', reporteCompleto.foto)
-        setReporteSeleccionado(reporteCompleto)
+        const response = await apiClient.get(`${API_ROUTES.REPORTES}${reporte.id}/`)
+        setReporteSeleccionado(response.data)
       } catch (error) {
         console.error('Error al obtener detalle del reporte:', error)
         // Si falla, usar el reporte de la lista
         setReporteSeleccionado(reporte)
+        toast.error('Error al cargar el detalle del reporte')
       }
     } else {
       setReporteSeleccionado(reporte)
     }
     
     setShowModal(true)
-    console.log('Modal debería mostrarse ahora')
   }
 
   const handleGuardarCambios = async () => {
@@ -506,26 +484,18 @@ function DashboardMunicipal() {
     const notasInternas = document.querySelector('textarea').value
 
     try {
-      const response = await fetch(`${API_ENDPOINTS.REPORTES}${reporteSeleccionado.id}/actualizar_estado/`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          estado: nuevoEstado,
-          notas_internas: notasInternas
-        })
+      await apiClient.patch(`${API_ROUTES.REPORTES}${reporteSeleccionado.id}/actualizar_estado/`, {
+        estado: nuevoEstado,
+        notas_internas: notasInternas
       })
 
-      if (response.ok) {
-        fetchReportes()
-        fetchEstadisticas()
-        setShowModal(false)
-        alert('Cambios guardados exitosamente')
-      }
+      fetchReportes()
+      fetchEstadisticas()
+      setShowModal(false)
+      toast.success('Cambios guardados exitosamente')
     } catch (error) {
       console.error('Error al actualizar:', error)
-      alert('Error al guardar cambios')
+      toast.error('Error al guardar cambios')
     }
   }
 
@@ -535,6 +505,7 @@ function DashboardMunicipal() {
       <div className="dashboard-header">
         <h1>🌱 EcoAlerta - Dashboard Municipal</h1>
         <div className="user-info">
+          <DarkModeToggle />
           <span>👤 Inspector Municipal</span>
           <button className="logout-btn" onClick={() => window.location.href = '/login'}>
             Cerrar Sesión
@@ -572,22 +543,65 @@ function DashboardMunicipal() {
         <div className="content">
           {/* Stats Cards */}
           <div className="stats-container">
-            <div className="stat-card stat-nuevos">
-              <h3>Nuevos</h3>
-              <div className="number">{estadisticas.nuevos}</div>
-            </div>
-            <div className="stat-card stat-proceso">
-              <h3>En Proceso</h3>
-              <div className="number">{estadisticas.en_proceso}</div>
-            </div>
-            <div className="stat-card stat-resueltos">
-              <h3>Resueltos</h3>
-              <div className="number">{estadisticas.resueltos}</div>
-            </div>
-            <div className="stat-card stat-total">
-              <h3>Total</h3>
-              <div className="number">{estadisticas.total}</div>
-            </div>
+            {loading ? (
+              <>
+                <div className="stat-card skeleton-stat-card">
+                  <Skeleton height="16px" width="60px" className="skeleton-title" />
+                  <Skeleton height="32px" width="80px" className="skeleton-number" />
+                </div>
+                <div className="stat-card skeleton-stat-card">
+                  <Skeleton height="16px" width="60px" className="skeleton-title" />
+                  <Skeleton height="32px" width="80px" className="skeleton-number" />
+                </div>
+                <div className="stat-card skeleton-stat-card">
+                  <Skeleton height="16px" width="60px" className="skeleton-title" />
+                  <Skeleton height="32px" width="80px" className="skeleton-number" />
+                </div>
+                <div className="stat-card skeleton-stat-card">
+                  <Skeleton height="16px" width="60px" className="skeleton-title" />
+                  <Skeleton height="32px" width="80px" className="skeleton-number" />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="stat-card stat-nuevos">
+                  <div className="stat-icon">🆕</div>
+                  <div className="stat-content">
+                    <h3>Nuevos</h3>
+                    <div className="number">
+                      <AnimatedNumber value={estadisticas.nuevos} />
+                    </div>
+                  </div>
+                </div>
+                <div className="stat-card stat-proceso">
+                  <div className="stat-icon">⏳</div>
+                  <div className="stat-content">
+                    <h3>En Proceso</h3>
+                    <div className="number">
+                      <AnimatedNumber value={estadisticas.en_proceso} />
+                    </div>
+                  </div>
+                </div>
+                <div className="stat-card stat-resueltos">
+                  <div className="stat-icon">✅</div>
+                  <div className="stat-content">
+                    <h3>Resueltos</h3>
+                    <div className="number">
+                      <AnimatedNumber value={estadisticas.resueltos} />
+                    </div>
+                  </div>
+                </div>
+                <div className="stat-card stat-total">
+                  <div className="stat-icon">📊</div>
+                  <div className="stat-content">
+                    <h3>Total</h3>
+                    <div className="number">
+                      <AnimatedNumber value={estadisticas.total} />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Filters */}
@@ -720,11 +734,19 @@ function DashboardMunicipal() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>
-                        Cargando reportes...
-                      </td>
-                    </tr>
+                    <>
+                      {[...Array(5)].map((_, i) => (
+                        <tr key={i} className="skeleton-table-row">
+                          <td><Skeleton height="16px" /></td>
+                          <td><Skeleton height="16px" /></td>
+                          <td><Skeleton height="16px" /></td>
+                          <td><Skeleton height="16px" /></td>
+                          <td><Skeleton height="16px" width="80px" /></td>
+                          <td><Skeleton height="16px" width="100px" /></td>
+                          <td><Skeleton height="24px" width="60px" /></td>
+                        </tr>
+                      ))}
+                    </>
                   ) : reportes.length === 0 ? (
                     <tr>
                       <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>
@@ -764,7 +786,7 @@ function DashboardMunicipal() {
                             }}
                             type="button"
                           >
-                            Ver
+                            <span>Ver</span>
                           </button>
                         </td>
                       </tr>

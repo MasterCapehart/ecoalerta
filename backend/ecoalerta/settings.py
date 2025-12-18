@@ -40,6 +40,8 @@ INSTALLED_APPS = [
 # Agregar el resto de las apps
 INSTALLED_APPS.extend([
     'rest_framework',
+    'rest_framework_simplejwt',  # JWT authentication
+    'drf_spectacular',  # API documentation
     'corsheaders',  # CORS support
     'whitenoise.runserver_nostatic',  # WhiteNoise para servir archivos estáticos
     'reportes',
@@ -168,10 +170,11 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',  # Cambiar a autenticación requerida por defecto
     ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [],
-    # Desactivar autenticación por defecto para API pública
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
@@ -180,6 +183,8 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.FormParser',
         'rest_framework.parsers.MultiPartParser',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'EXCEPTION_HANDLER': 'reportes.exceptions.custom_exception_handler',
 }
 
 # CORS settings
@@ -194,8 +199,8 @@ azure_frontend_url = os.getenv('AZURE_FRONTEND_URL', '')
 if azure_frontend_url:
     CORS_ALLOWED_ORIGINS.append(azure_frontend_url)
 
-# Permitir todos los orígenes temporalmente para asegurar que funcione
-CORS_ALLOW_ALL_ORIGINS = True  # True para permitir todos los orígenes
+# Permitir todos los orígenes solo en desarrollo
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Solo en desarrollo
 CORS_ALLOW_CREDENTIALS = True
 
 # Configuración adicional de CORS para evitar problemas
@@ -275,3 +280,125 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
+
+# JWT Configuration
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
+
+# API Documentation (drf-spectacular)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'EcoAlerta API',
+    'DESCRIPTION': 'API para gestión de reportes ambientales',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+}
+
+# Caché Configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+        'KEY_PREFIX': 'ecoalerta',
+        'TIMEOUT': 300,  # 5 minutos por defecto
+    }
+}
+
+# Si Redis no está disponible, usar caché en memoria
+try:
+    import redis
+    r = redis.from_url(os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'))
+    r.ping()
+except Exception:
+    CACHES['default'] = {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+
+# Logging Configuration
+LOGGING_DIR = BASE_DIR / 'logs'
+LOGGING_DIR.mkdir(exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': LOGGING_DIR / 'django.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'reportes': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console', 'file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}
+
+# Validación de variables de entorno críticas en producción
+if not DEBUG:
+    required_env_vars = ['SECRET_KEY', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_HOST']
+    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+    if missing_vars:
+        raise ValueError(
+            f"Variables de entorno faltantes en producción: {', '.join(missing_vars)}"
+        )
+    
+    # Validar que SECRET_KEY no sea el valor por defecto
+    if SECRET_KEY == 'django-insecure-eccalerta-dev-key-change-in-production':
+        raise ValueError(
+            "SECRET_KEY debe ser cambiado en producción. "
+            "No uses el valor por defecto."
+        )

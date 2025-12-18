@@ -102,16 +102,19 @@ function Estadisticas() {
                   <div 
                     className="bar bar-nuevos" 
                     style={{ height: `${dato.nuevos * 5}px` }}
+                    data-value={`Nuevos: ${dato.nuevos}`}
                     title={`Nuevos: ${dato.nuevos}`}
                   ></div>
                   <div 
                     className="bar bar-proceso" 
                     style={{ height: `${dato.proceso * 5}px` }}
+                    data-value={`En Proceso: ${dato.proceso}`}
                     title={`En Proceso: ${dato.proceso}`}
                   ></div>
                   <div 
                     className="bar bar-resueltos" 
                     style={{ height: `${dato.resueltos * 5}px` }}
+                    data-value={`Resueltos: ${dato.resueltos}`}
                     title={`Resueltos: ${dato.resueltos}`}
                   ></div>
                 </div>

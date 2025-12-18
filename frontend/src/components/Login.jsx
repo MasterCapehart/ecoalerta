@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { API_ENDPOINTS } from '../config'
+import apiClient from '../services/api'
 import './Login.css'
 import logo from '../assets/images/logo-green.png'
+import { toast } from './ToastContainer'
 
 function Login() {
   const [usuario, setUsuario] = useState('')
@@ -15,46 +16,30 @@ function Login() {
     setLoading(true)
     
     try {
-      console.log('Intentando login en:', API_ENDPOINTS.LOGIN)
-      console.log('Usuario:', usuario)
-      
-      const response = await fetch(API_ENDPOINTS.LOGIN, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username: usuario, password: password }),
+      const response = await apiClient.post('/api/auth/login/', {
+        username: usuario,
+        password: password,
       })
 
-      console.log('Respuesta status:', response.status)
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error del servidor:', errorText)
-        try {
-          const errorData = JSON.parse(errorText)
-          alert(errorData.error || `Error ${response.status}: ${response.statusText}`)
-        } catch {
-          alert(`Error ${response.status}: ${errorText.substring(0, 100)}`)
+      if (response.data.success) {
+        // Guardar tokens JWT
+        if (response.data.access) {
+          localStorage.setItem('access_token', response.data.access)
         }
-        return
-      }
-
-      const data = await response.json()
-      console.log('Datos recibidos:', data)
-
-      if (data.success) {
-        // Guardar datos del usuario en localStorage
-        localStorage.setItem('user', JSON.stringify(data.user))
-        console.log('Usuario guardado, navegando a dashboard...')
+        if (response.data.refresh) {
+          localStorage.setItem('refresh_token', response.data.refresh)
+        }
+        
+        // Guardar datos del usuario
+        localStorage.setItem('user', JSON.stringify(response.data.user))
+        
+        toast.success('Inicio de sesión exitoso')
         navigate('/dashboard')
       } else {
-        alert(data.error || 'Credenciales incorrectas')
+        toast.error(response.data.error || 'Credenciales incorrectas')
       }
     } catch (error) {
-      console.error('Error al conectar con el servidor:', error)
-      console.error('URL intentada:', API_ENDPOINTS.LOGIN)
-      alert(`Error al conectar con el servidor: ${error.message}\n\nURL: ${API_ENDPOINTS.LOGIN}`)
+      toast.error(error.message || 'Error al conectar con el servidor')
     } finally {
       setLoading(false)
     }
@@ -92,7 +77,7 @@ function Login() {
           </div>
 
           <button type="submit" className="btn-login" disabled={loading}>
-            {loading ? 'Conectando...' : 'Iniciar Sesión'}
+            <span>{loading ? 'Conectando...' : 'Iniciar Sesión'}</span>
           </button>
         </form>
 

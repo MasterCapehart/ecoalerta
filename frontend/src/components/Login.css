@@ -1,5 +1,4 @@
 .login-container {
-  /* Fill viewport exactly and ignore body paddings to avoid unwanted scroll */
   position: fixed;
   inset: 0;
   display: flex;
@@ -11,6 +10,7 @@
   box-sizing: border-box;
 }
 
+/* Partículas decorativas flotantes */
 .login-container::before {
   content: '';
   position: absolute;
@@ -18,100 +18,717 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.3); 
+  background: linear-gradient(135deg, rgba(34, 139, 34, 0.4), rgba(173, 255, 47, 0.3));
+  backdrop-filter: blur(2px);
+}
+
+/* Círculos decorativos flotantes */
+.login-container::after {
+  content: '';
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(34, 139, 34, 0.15), transparent);
+  border-radius: 50%;
+  top: -150px;
+  right: -150px;
+  animation: float 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(-50px, 50px) scale(1.1);
+  }
+  66% {
+    transform: translate(50px, -50px) scale(0.9);
+  }
 }
 
 .login-box {
-  background: white;
-  padding: 35px;
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  width: 380px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  padding: 50px 45px;
+  border-radius: 25px;
+  box-shadow: 
+    0 20px 60px rgba(34, 139, 34, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  width: 450px;
   position: relative;
   z-index: 1;
-  max-height: 85vh;
+  max-height: 90vh;
   overflow-y: auto;
   box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  animation: slideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+  margin: auto;
+}
+
+/* Más círculos decorativos */
+.login-box::before {
+  content: '';
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(173, 255, 47, 0.1), transparent);
+  border-radius: 50%;
+  bottom: -100px;
+  left: -100px;
+  animation: floatReverse 15s ease-in-out infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, -30px) scale(1.2);
+  }
+}
+
+/* Efecto de brillo que se mueve */
+.login-box::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 70%
+  );
+  animation: shine 4s infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .login-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 40px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Línea decorativa animada bajo el header */
+.login-header::after {
+  content: '';
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #228B22, #ADFF2F, transparent);
+  border-radius: 2px;
+  animation: expandLine 0.8s ease-out 0.3s forwards;
+}
+
+@keyframes expandLine {
+  to {
+    width: 80px;
+  }
+}
+
+.login-header img {
+  max-width: 140px;
+  margin-bottom: 20px;
+  filter: drop-shadow(0 4px 12px rgba(34, 139, 34, 0.3));
+  animation: logoFloat 3s ease-in-out infinite;
+}
+
+@keyframes logoFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
 }
 
 .login-header h1 {
-  font-size: 32px;
+  font-size: 28px;
   color: #228B22;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #228B22, #32a832);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .login-header p {
-  color: #666;
-  font-size: 14px;
+  color: #6c757d;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .form-group {
-  margin-bottom: 18px;
+  margin-bottom: 24px;
+  position: relative;
+  z-index: 1;
 }
 
 .form-group label {
-  display: block;
-  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
   font-weight: 600;
-  color: #333;
+  color: #212529;
+  font-size: 14px;
+}
+
+/* Iconos para los labels */
+.form-group:first-of-type label::before {
+  content: '👤';
+  font-size: 18px;
+}
+
+.form-group:last-of-type label::before {
+  content: '🔒';
+  font-size: 18px;
 }
 
 .form-group input {
   width: 100%;
-  padding: 12px;
+  padding: 16px 20px 16px 50px;
   border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 12px;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .form-group input:focus {
   outline: none;
   border-color: #228B22;
+  box-shadow: 
+    0 0 0 4px rgba(34, 139, 34, 0.1),
+    0 4px 12px rgba(34, 139, 34, 0.15);
+  transform: translateY(-2px);
+  background: white;
 }
 
+.form-group input::placeholder {
+  color: #6c757d;
+  opacity: 0.6;
+}
+
+/* Efecto de ondas en el botón */
 .btn-login {
   width: 100%;
-  padding: 14px;
-  background: linear-gradient(180deg, #228B22, #ADFF2F);
+  padding: 18px;
+  background: linear-gradient(135deg, #228B22, #32a832, #ADFF2F);
+  background-size: 200% 200%;
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  margin-top: 10px;
+  margin-top: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 6px 20px rgba(34, 139, 34, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+  animation: gradientShift 3s ease infinite;
+  z-index: 1;
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Efecto de ondas al hacer clic */
+.btn-login::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+  z-index: 0;
+}
+
+.btn-login:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+.btn-login span {
+  position: relative;
+  z-index: 1;
+}
+
+/* Efecto de brillo que se mueve en el botón */
+.btn-login::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+  z-index: 1;
+}
+
+.btn-login:hover::after {
+  left: 100%;
+}
+
+.btn-login:hover {
+  transform: translateY(-3px);
+  box-shadow: 
+    0 10px 30px rgba(34, 139, 34, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-login:active {
+  transform: translateY(-1px);
+}
+
+.btn-login:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  animation: none;
 }
 
 .login-footer {
-  margin-top: 25px;
+  margin-top: 32px;
   text-align: center;
-  padding-top: 15px;
-  border-top: 1px solid #e0e0e0;
+  padding-top: 24px;
+  border-top: 2px solid #e8f5e9;
+  position: relative;
+  z-index: 1;
+}
+
+.login-footer::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #228B22, transparent);
 }
 
 .login-footer p {
-  color: #666;
-  margin-bottom: 10px;
+  color: #6c757d;
+  margin-bottom: 14px;
   font-size: 14px;
 }
 
 .btn-ciudadano {
-  padding: 10px 20px;
+  padding: 14px 28px;
   background: white;
   color: #228B22;
   border: 2px solid #228B22;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-ciudadano::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(34, 139, 34, 0.1), transparent);
+  transition: left 0.5s;
+}
+
+.btn-ciudadano:hover::before {
+  left: 100%;
 }
 
 .btn-ciudadano:hover {
-  background: #228B22;
+  background: linear-gradient(135deg, #228B22, #32a832);
   color: white;
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 20px rgba(34, 139, 34, 0.3);
+  border-color: #32a832;
+}
+
+/* ============================================
+   MEDIA QUERIES - DISEÑO RESPONSIVO
+   ============================================ */
+
+/* Tablets (768px - 1024px) */
+@media (max-width: 1024px) {
+  .login-box {
+    width: 420px;
+    padding: 45px 40px;
+  }
+
+  .login-header img {
+    max-width: 120px;
+  }
+
+  .login-header h1 {
+    font-size: 26px;
+  }
+}
+
+/* Tablets pequeñas y móviles grandes (hasta 768px) */
+@media (max-width: 768px) {
+  .login-container {
+    padding: 20px;
+    align-items: flex-start;
+    padding-top: 40px;
+  }
+
+  /* Reducir círculos decorativos en móvil */
+  .login-container::after {
+    width: 200px;
+    height: 200px;
+    top: -100px;
+    right: -100px;
+  }
+
+  .login-box {
+    width: 100%;
+    max-width: 400px;
+    padding: 35px 30px;
+    border-radius: 20px;
+    margin: 0 auto;
+    max-height: calc(100vh - 40px);
+  }
+
+  /* Reducir círculo decorativo del login-box */
+  .login-box::before {
+    width: 150px;
+    height: 150px;
+    bottom: -75px;
+    left: -75px;
+  }
+
+  .login-header {
+    margin-bottom: 30px;
+  }
+
+  .login-header img {
+    max-width: 100px;
+    margin-bottom: 15px;
+  }
+
+  .login-header h1 {
+    font-size: 24px;
+    margin-bottom: 6px;
+  }
+
+  .login-header p {
+    font-size: 14px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+
+  .form-group:first-of-type label::before,
+  .form-group:last-of-type label::before {
+    font-size: 16px;
+  }
+
+  .form-group input {
+    padding: 14px 18px 14px 45px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+
+  .btn-login {
+    padding: 16px;
+    font-size: 15px;
+    border-radius: 10px;
+  }
+
+  .login-footer {
+    margin-top: 28px;
+    padding-top: 20px;
+  }
+
+  .login-footer p {
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .btn-ciudadano {
+    padding: 12px 24px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+}
+
+/* Móviles pequeños (hasta 480px) */
+@media (max-width: 480px) {
+  .login-container {
+    padding: 15px;
+    padding-top: 30px;
+  }
+
+  /* Ocultar o reducir más los círculos decorativos */
+  .login-container::after {
+    width: 150px;
+    height: 150px;
+    top: -75px;
+    right: -75px;
+  }
+
+  .login-box {
+    padding: 30px 25px;
+    border-radius: 18px;
+    max-height: calc(100vh - 30px);
+  }
+
+  .login-box::before {
+    width: 120px;
+    height: 120px;
+    bottom: -60px;
+    left: -60px;
+  }
+
+  .login-header {
+    margin-bottom: 25px;
+  }
+
+  .login-header img {
+    max-width: 80px;
+    margin-bottom: 12px;
+  }
+
+  .login-header h1 {
+    font-size: 22px;
+    margin-bottom: 5px;
+  }
+
+  .login-header p {
+    font-size: 13px;
+  }
+
+  /* Línea decorativa más pequeña */
+  .login-header::after {
+    height: 2px;
+  }
+
+  @keyframes expandLine {
+    to {
+      width: 60px;
+    }
+  }
+
+  .form-group {
+    margin-bottom: 18px;
+  }
+
+  .form-group label {
+    font-size: 12px;
+    margin-bottom: 6px;
+    gap: 6px;
+  }
+
+  .form-group:first-of-type label::before,
+  .form-group:last-of-type label::before {
+    font-size: 14px;
+  }
+
+  .form-group input {
+    padding: 12px 16px 12px 40px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+
+  .form-group input:focus {
+    box-shadow: 
+      0 0 0 3px rgba(34, 139, 34, 0.1),
+      0 2px 8px rgba(34, 139, 34, 0.12);
+    transform: translateY(-1px);
+  }
+
+  .btn-login {
+    padding: 14px;
+    font-size: 14px;
+    border-radius: 8px;
+    margin-top: 10px;
+  }
+
+  .btn-login:hover {
+    transform: translateY(-2px);
+  }
+
+  .login-footer {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top-width: 1px;
+  }
+
+  .login-footer::before {
+    width: 50px;
+    height: 1px;
+  }
+
+  .login-footer p {
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+
+  .btn-ciudadano {
+    padding: 10px 20px;
+    font-size: 12px;
+    border-radius: 8px;
+    width: 100%;
+  }
+
+  .btn-ciudadano:hover {
+    transform: translateY(-2px) scale(1);
+  }
+}
+
+/* Móviles muy pequeños (hasta 360px) */
+@media (max-width: 360px) {
+  .login-container {
+    padding: 10px;
+    padding-top: 20px;
+  }
+
+  .login-box {
+    padding: 25px 20px;
+    border-radius: 16px;
+  }
+
+  .login-header img {
+    max-width: 70px;
+  }
+
+  .login-header h1 {
+    font-size: 20px;
+  }
+
+  .form-group input {
+    padding: 11px 14px 11px 38px;
+    font-size: 13px;
+  }
+
+  .btn-login {
+    padding: 13px;
+    font-size: 13px;
+  }
+}
+
+/* Orientación landscape en móviles */
+@media (max-height: 600px) and (orientation: landscape) {
+  .login-container {
+    align-items: center;
+    padding: 10px;
+  }
+
+  .login-box {
+    max-height: 95vh;
+    padding: 25px 30px;
+  }
+
+  .login-header {
+    margin-bottom: 20px;
+  }
+
+  .login-header img {
+    max-width: 70px;
+    margin-bottom: 10px;
+  }
+
+  .login-header h1 {
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+
+  .login-header p {
+    font-size: 12px;
+  }
+
+  .form-group {
+    margin-bottom: 15px;
+  }
+
+  .login-footer {
+    margin-top: 20px;
+    padding-top: 15px;
+  }
+}
+
+/* Deshabilitar animaciones en dispositivos que prefieren movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .login-box {
+    animation: none;
+  }
+
+  .login-header img {
+    animation: none;
+  }
+
+  .btn-login {
+    animation: none;
+  }
 }
