@@ -1,0 +1,151 @@
+.location-updater {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  z-index: 2000;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.location-updater-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+  border-radius: 12px 12px 0 0;
+}
+
+.location-updater-header h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.location-updater-content {
+  padding: 24px;
+}
+
+.location-help {
+  margin: 0 0 16px 0;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.location-map-container {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #e0e0e0;
+  margin-bottom: 16px;
+}
+
+.location-info {
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.location-info p {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.location-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-locate,
+.btn-update {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-locate {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.btn-locate:hover {
+  background: #e0e0e0;
+}
+
+.btn-update {
+  background: #007bff;
+  color: white;
+}
+
+.btn-update:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.btn-update:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Overlay */
+.location-updater::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: -1;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .location-updater {
+    width: 95%;
+    max-height: 85vh;
+  }
+  
+  .location-actions {
+    flex-direction: column;
+  }
+  
+  .btn-locate,
+  .btn-update {
+    width: 100%;
+  }
+}

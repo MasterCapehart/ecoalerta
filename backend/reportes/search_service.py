@@ -1,0 +1,179 @@
+"""
+Servicio de búsqueda avanzada para reportes
+"""
+from django.db.models import Q, F, Value, CharField
+from django.db.models.functions import Concat
+from django.utils import timezone
+from datetime import timedelta
+import logging
+
+logger = logging.getLogger('reportes')
+
+
+class SearchService:
+    """Servicio para búsqueda y filtrado avanzado de reportes"""
+    
+    @staticmethod
+    def search_reportes(queryset, search_params):
+        """
+        Aplica búsqueda y filtros avanzados a un queryset de reportes
+        
+        Parámetros:
+        - queryset: QuerySet inicial de Reporte
+        - search_params: dict con parámetros de búsqueda:
+            - q: texto de búsqueda (búsqueda full-text)
+            - estado: filtro por estado
+            - categoria: filtro por categoría
+            - asignado_a: filtro por inspector asignado
+            - prioridad: filtro por prioridad
+            - tags: lista de IDs de tags
+            - fecha_desde: fecha desde
+            - fecha_hasta: fecha hasta
+            - lat, lng, radio: búsqueda por proximidad (en km)
+            - ordenar_por: campo para ordenar
+            - orden: 'asc' o 'desc'
+            - es_spam: filtro por spam
+            - validado: filtro por validado
+        """
+        # Búsqueda full-text
+        if search_params.get('q'):
+            query_text = search_params['q']
+            queryset = SearchService._apply_fulltext_search(queryset, query_text)
+        
+        # Filtros básicos
+        if search_params.get('estado'):
+            queryset = queryset.filter(estado=search_params['estado'])
+        
+        if search_params.get('categoria'):
+            queryset = queryset.filter(categoria_id=search_params['categoria'])
+        
+        if search_params.get('asignado_a'):
+            queryset = queryset.filter(asignado_a_id=search_params['asignado_a'])
+        
+        if search_params.get('prioridad'):
+            queryset = queryset.filter(prioridad=search_params['prioridad'])
+        
+        if search_params.get('tags'):
+            tag_ids = search_params['tags'] if isinstance(search_params['tags'], list) else [search_params['tags']]
+            queryset = queryset.filter(tags__id__in=tag_ids).distinct()
+        
+        # Filtros de fecha
+        if search_params.get('fecha_desde'):
+            queryset = queryset.filter(fecha_creacion__gte=search_params['fecha_desde'])
+        
+        if search_params.get('fecha_hasta'):
+            queryset = queryset.filter(fecha_creacion__lte=search_params['fecha_hasta'])
+        
+        # Búsqueda por proximidad
+        if all(k in search_params for k in ['lat', 'lng', 'radio']):
+            queryset = SearchService._filter_by_proximity(
+                queryset,
+                float(search_params['lat']),
+                float(search_params['lng']),
+                float(search_params['radio'])
+            )
+        
+        # Filtros de validación
+        if 'es_spam' in search_params:
+            queryset = queryset.filter(es_spam=search_params['es_spam'])
+        
+        if 'validado' in search_params:
+            queryset = queryset.filter(validado=search_params['validado'])
+        
+        # Ordenamiento
+        ordenar_por = search_params.get('ordenar_por')
+        # Si no hay ordenamiento explícito, o si es el default (fecha_creacion)
+        # y estamos buscando por texto, preferimos ordenar por relevancia (rank)
+        if (not ordenar_por or ordenar_por == 'fecha_creacion') and search_params.get('q'):
+            ordenar_por = '-rank'
+        elif not ordenar_por:
+            ordenar_por = '-fecha_creacion'
+        else:
+            orden = search_params.get('orden', 'desc')
+            if orden == 'desc' and not ordenar_por.startswith('-'):
+                ordenar_por = f'-{ordenar_por}'
+        
+        # Solo ordenar por rank si el queryset tiene la anotación
+        try:
+            queryset = queryset.order_by(ordenar_por)
+        except Exception:
+            # Fallback en caso de que '-rank' falle porque exact match no lo anotó
+            if ordenar_por == '-rank':
+                queryset = queryset.order_by('-fecha_creacion')
+            else:
+                pass
+        
+        return queryset
+    
+    @staticmethod
+    def _apply_fulltext_search(queryset, query_text):
+        """Aplica búsqueda full-text en múltiples campos usando PostgreSQL"""
+        from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
+        
+        # Búsqueda exacta en código
+        if len(query_text) >= 3:
+            exact_match = queryset.filter(codigo_seguimiento__icontains=query_text)
+            if exact_match.exists():
+                return exact_match.annotate(rank=Value(1.0))
+        
+        # Búsqueda Full-Text ponderada
+        vector = (
+            SearchVector('descripcion', weight='A') +
+            SearchVector('direccion', weight='B') +
+            SearchVector('direccion_completa', weight='B') +
+            SearchVector('categoria__nombre', weight='C') +
+            SearchVector('email', weight='D')
+        )
+        query = SearchQuery(query_text)
+        
+        return queryset.annotate(
+            rank=SearchRank(vector, query)
+        ).filter(rank__gte=0.01)
+    
+    @staticmethod
+    def _filter_by_proximity(queryset, lat, lng, radio_km):
+        """
+        Filtra reportes por proximidad usando la fórmula de Haversine
+        radio_km: radio en kilómetros
+        """
+        # Fórmula de Haversine simplificada para distancias pequeñas
+        # 1 grado de latitud ≈ 111 km
+        # 1 grado de longitud ≈ 111 km * cos(latitud)
+        
+        lat_delta = radio_km / 111.0
+        lng_delta = radio_km / (111.0 * abs(__import__('math').cos(__import__('math').radians(lat))))
+        
+        # Filtro aproximado por bounding box
+        queryset = queryset.filter(
+            ubicacion_lat__gte=lat - lat_delta,
+            ubicacion_lat__lte=lat + lat_delta,
+            ubicacion_lng__gte=lng - lng_delta,
+            ubicacion_lng__lte=lng + lng_delta
+        )
+        
+        # Calcular distancia exacta y filtrar (esto se puede optimizar)
+        # Por ahora, retornamos el bounding box y calculamos distancia en Python si es necesario
+        return queryset
+    
+    @staticmethod
+    def calculate_distance(lat1, lng1, lat2, lng2):
+        """
+        Calcula la distancia entre dos puntos usando la fórmula de Haversine
+        Retorna la distancia en kilómetros
+        """
+        import math
+        
+        R = 6371  # Radio de la Tierra en km
+        
+        dlat = math.radians(lat2 - lat1)
+        dlng = math.radians(lng2 - lng1)
+        
+        a = (math.sin(dlat / 2) ** 2 +
+             math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+             math.sin(dlng / 2) ** 2)
+        
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = R * c
+        
+        return distance
+

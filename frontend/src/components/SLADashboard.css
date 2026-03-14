@@ -1,0 +1,256 @@
+.sla-dashboard {
+  padding: 24px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.sla-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.sla-header h2 {
+  margin: 0 0 16px 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.sla-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.sla-tabs button {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.sla-tabs button:hover {
+  background: #f5f5f5;
+}
+
+.sla-tabs button.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.sla-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  text-align: center;
+  border-left: 4px solid #007bff;
+}
+
+.stat-card.warning {
+  border-left-color: #ffc107;
+}
+
+.stat-card.danger {
+  border-left-color: #dc3545;
+}
+
+.stat-card.success {
+  border-left-color: #28a745;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sla-reportes {
+  margin-top: 24px;
+}
+
+.sla-loading,
+.no-reportes {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.reportes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reporte-item {
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+  background: #f9f9f9;
+}
+
+.reporte-item.warning {
+  border-left-color: #ffc107;
+  background: #fffbf0;
+}
+
+.reporte-item.danger {
+  border-left-color: #dc3545;
+  background: #fff5f5;
+}
+
+.reporte-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.reporte-code {
+  font-weight: 600;
+  color: #333;
+  font-size: 16px;
+}
+
+.reporte-estado {
+  padding: 4px 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.reporte-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #666;
+}
+
+.tiempo-restante {
+  color: #ffc107;
+  font-weight: 600;
+}
+
+.tiempo-excedido {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.reporte-fecha {
+  font-size: 12px;
+  color: #999;
+}
+
+@media (max-width: 768px) {
+  .sla-dashboard {
+    padding: 16px;
+  }
+
+  .sla-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .sla-tabs {
+    flex-direction: column;
+  }
+
+  .sla-tabs button {
+    width: 100%;
+  }
+
+  .reporte-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .reporte-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+.dark-mode .sla-dashboard {
+  background: #1f2937;
+  border: 1px solid #334155;
+  box-shadow: none;
+}
+
+.dark-mode .sla-header {
+  border-bottom-color: #334155;
+}
+
+.dark-mode .sla-header h2,
+.dark-mode .sla-dashboard .reporte-code {
+  color: #e2e8f0;
+}
+
+.dark-mode .sla-tabs button {
+  background: #111827;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+.dark-mode .sla-tabs button:hover {
+  background: #1f2937;
+}
+
+.dark-mode .sla-tabs button.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.dark-mode .sla-dashboard .stat-card {
+  background: #111827;
+}
+
+.dark-mode .sla-dashboard .stat-value {
+  color: #86efac;
+}
+
+.dark-mode .sla-dashboard .stat-label,
+.dark-mode .sla-dashboard .reporte-info,
+.dark-mode .sla-dashboard .reporte-fecha,
+.dark-mode .sla-dashboard .sla-loading,
+.dark-mode .sla-dashboard .no-reportes {
+  color: #94a3b8;
+}
+
+.dark-mode .sla-dashboard .reporte-item {
+  background: #111827;
+}
+
+.dark-mode .sla-dashboard .reporte-item.warning {
+  background: #3f2b0e;
+}
+
+.dark-mode .sla-dashboard .reporte-item.danger {
+  background: #3f1d1d;
+}
+
+.dark-mode .sla-dashboard .reporte-estado {
+  background: #334155;
+  color: #cbd5e1;
+}

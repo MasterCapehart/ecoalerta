@@ -10,14 +10,27 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tensorflow-models/mobilenet": "^2.1.1",
+    "@tensorflow/tfjs": "^4.22.0",
     "axios": "^1.6.0",
+    "cesium": "^1.112.0",
+    "date-fns": "^3.0.0",
+    "idb": "^8.0.3",
     "leaflet": "^1.9.4",
     "leaflet.heat": "^0.2.0",
+    "lucide-react": "^0.562.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.48.0",
+    "react-joyride": "^2.9.3",
     "react-leaflet": "^4.2.1",
-    "react-router-dom": "^6.21.1"
+    "react-router-dom": "^6.21.1",
+    "react-select": "^5.8.0",
+    "react-toastify": "^11.0.5",
+    "recharts": "^2.10.3",
+    "vite-plugin-cesium": "^1.2.23",
+    "vite-plugin-pwa": "^1.2.0",
+    "workbox-window": "^7.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

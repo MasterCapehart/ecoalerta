@@ -35,21 +35,69 @@ class Command(BaseCommand):
                     self.style.WARNING(f'Categoría ya existe: {categoria.nombre}')
                 )
 
-        # Crear usuario inspector por defecto
-        if not Usuario.objects.filter(username='inspector').exists():
-            inspector = Usuario.objects.create_user(
-                username='inspector',
-                password='1234',
-                tipo='inspector',
-                email='inspector@ecoalerta.cl'
-            )
+        # Crear o actualizar usuario inspector por defecto como administrador
+        inspector, created = Usuario.objects.get_or_create(
+            username='inspector',
+            defaults={
+                'password': '1234',
+                'tipo': 'admin',
+                'email': 'inspector@ecoalerta.cl'
+            }
+        )
+        
+        if created:
+            inspector.set_password('1234')
+            inspector.save()
             self.stdout.write(
-                self.style.SUCCESS('Usuario inspector creado (usuario: inspector, password: 1234)')
+                self.style.SUCCESS('Usuario inspector creado como administrador (usuario: inspector, password: 1234)')
             )
         else:
+            # Actualizar el usuario existente a administrador si no lo es
+            if inspector.tipo != 'admin':
+                inspector.tipo = 'admin'
+                inspector.save()
+                self.stdout.write(
+                    self.style.SUCCESS('Usuario inspector actualizado a administrador')
+                )
+            else:
+                self.stdout.write(
+                    self.style.WARNING('Usuario inspector ya existe y es administrador')
+                )
+
+        # Crear o actualizar usuario administrador con todos los permisos
+        administrador, created = Usuario.objects.get_or_create(
+            username='administrador',
+            defaults={
+                'password': '1234',
+                'tipo': 'admin',
+                'email': 'administrador@ecoalerta.cl',
+                'is_staff': True,
+                'is_superuser': True
+            }
+        )
+        
+        if created:
+            administrador.set_password('1234')
+            administrador.is_staff = True
+            administrador.is_superuser = True
+            administrador.save()
             self.stdout.write(
-                self.style.WARNING('Usuario inspector ya existe')
+                self.style.SUCCESS('Usuario administrador creado con todos los permisos (usuario: administrador, password: 1234)')
             )
+        else:
+            # Actualizar el usuario existente para asegurar que tenga todos los permisos
+            if administrador.tipo != 'admin' or not administrador.is_staff or not administrador.is_superuser:
+                administrador.tipo = 'admin'
+                administrador.is_staff = True
+                administrador.is_superuser = True
+                administrador.save()
+                self.stdout.write(
+                    self.style.SUCCESS('Usuario administrador actualizado con todos los permisos')
+                )
+            else:
+                self.stdout.write(
+                    self.style.WARNING('Usuario administrador ya existe con todos los permisos')
+                )
 
         # Crear reportes de ejemplo solo si no existen
         if Reporte.objects.exists():

@@ -61,6 +61,24 @@ apiClient.interceptors.response.use(
       }
     }
 
+    // Manejo de rate limiting (429)
+    if (error.response?.status === 429) {
+      const retryAfter = error.response.data?.retry_after || error.response.headers['retry-after']
+      const waitTime = retryAfter ? parseInt(retryAfter) : 60
+      const errorMessage = error.response.data?.message ||
+        `Demasiadas solicitudes. Por favor espera ${waitTime} segundos antes de intentar nuevamente.`
+
+      // Mostrar notificación al usuario
+      if (typeof window !== 'undefined' && window.dispatchEvent) {
+        const event = new CustomEvent('rateLimitExceeded', {
+          detail: { waitTime, message: errorMessage }
+        })
+        window.dispatchEvent(event)
+      }
+
+      return Promise.reject(new Error(errorMessage))
+    }
+
     // Manejo de otros errores
     if (error.response) {
       // El servidor respondió con un código de estado fuera del rango 2xx
@@ -82,6 +100,18 @@ apiClient.interceptors.response.use(
     }
   }
 )
+
+export const API_ROUTES = {
+  REPORTES: '/api/reportes/',
+  REPORTES_VERIFICAR_DUPLICADOS: '/api/reportes/verificar_duplicados/',
+  CATEGORIAS: '/api/categorias/',
+  AUTH_LOGIN: '/api/auth/login/',
+  AUTH_REFRESH: '/api/auth/refresh/',
+  USUARIOS: '/api/usuarios/',
+  ESTADISTICAS: '/api/reportes/estadisticas/',
+  ANALYTICS_EJECUTIVO: '/api/analytics/ejecutivo/',
+  MIS_REPORTES: '/api/reportes/mis_reportes/',
+}
 
 export default apiClient
 

@@ -47,7 +47,7 @@ function ToastContainer() {
   }, [addToast])
 
   return (
-    <div className="toast-container">
+    <div className="toast-container" role="region" aria-live="polite" aria-atomic="true" aria-label="Notificaciones del sistema">
       {toasts.map(toast => (
         <Toast
           key={toast.id}

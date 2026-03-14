@@ -13,11 +13,11 @@ class IsInspectorOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
         
-        # Para escritura, requiere autenticación y ser inspector
+        # Para escritura, requiere autenticación y ser inspector o admin
         return (
             request.user and
             request.user.is_authenticated and
-            (request.user.tipo == 'inspector' or request.user.is_staff)
+            (request.user.tipo == 'inspector' or request.user.tipo == 'admin' or request.user.is_staff)
         )
 
 
@@ -29,7 +29,7 @@ class IsInspector(permissions.BasePermission):
         return (
             request.user and
             request.user.is_authenticated and
-            (request.user.tipo == 'inspector' or request.user.is_staff)
+            (request.user.tipo == 'inspector' or request.user.tipo == 'admin' or request.user.is_staff)
         )
 
 

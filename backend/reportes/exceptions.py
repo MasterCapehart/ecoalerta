@@ -39,6 +39,14 @@ def custom_exception_handler(exc, context):
             custom_response_data['message'] = 'No autorizado'
         elif response.status_code == 404:
             custom_response_data['message'] = 'Recurso no encontrado'
+        elif response.status_code == 429:
+            # Rate limiting
+            wait_time = response.data.get('wait', None)
+            if wait_time:
+                custom_response_data['message'] = f'Demasiadas solicitudes. Intenta nuevamente en {wait_time} segundos.'
+            else:
+                custom_response_data['message'] = 'Demasiadas solicitudes. Por favor espera un momento antes de intentar nuevamente.'
+            custom_response_data['retry_after'] = wait_time
         elif response.status_code == 500:
             custom_response_data['message'] = 'Error interno del servidor'
         

@@ -1,9 +1,11 @@
 # Models - Usando modelos estándar (sin PostGIS por ahora)
 # TODO: Migrar a PostGIS cuando GDAL esté instalado correctamente en Azure
-from django.db import models
+from django.contrib.gis.db import models
+from django.contrib.gis.geos import Point
 from django.contrib.auth.models import AbstractUser
 import secrets
 import string
+from simple_history.models import HistoricalRecords
 
 
 def generate_tracking_code():
@@ -25,6 +27,12 @@ class Usuario(AbstractUser):
     
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='ciudadano')
     telefono = models.CharField(max_length=20, blank=True, null=True)
+    # Ubicación actual del inspector (para asignación y rutas)
+    ubicacion_actual_lat = models.FloatField(null=True, blank=True)
+    ubicacion_actual_lng = models.FloatField(null=True, blank=True)
+    fecha_actualizacion_ubicacion = models.DateTimeField(null=True, blank=True)
+    tour_completado = models.BooleanField(default=False)
+    history = HistoricalRecords()
     
     class Meta:
         verbose_name = 'Usuario'
@@ -76,35 +84,20 @@ class Reporte(models.Model):
     )
     
     # Ubicación geográfica
-    # Usar campos de latitud y longitud temporalmente (sin PostGIS)
-    # TODO: Migrar a PointField cuando GDAL esté instalado correctamente
-    ubicacion_lat = models.FloatField(null=True, blank=True, db_index=True)
-    ubicacion_lng = models.FloatField(null=True, blank=True, db_index=True)
+    # Ubicación geográfica
+    ubicacion = models.PointField(srid=4326, null=True, blank=True)
+    
+    # Mantenemos lat/lng como propiedades calculadas para compatibilidad hacia atrás
+    @property
+    def ubicacion_lat(self):
+        return self.ubicacion.y if self.ubicacion else None
+        
+    @property
+    def ubicacion_lng(self):
+        return self.ubicacion.x if self.ubicacion else None
     direccion = models.CharField(max_length=255, blank=True)
     
-    # Propiedad para compatibilidad con código que espera ubicacion como Point
-    @property
-    def ubicacion(self):
-        if self.ubicacion_lat is not None and self.ubicacion_lng is not None:
-            # Retornar un objeto que simule un Point
-            class FakePoint:
-                def __init__(self, lat, lng):
-                    self.y = lat
-                    self.x = lng
-                def __bool__(self):
-                    return True
-            return FakePoint(self.ubicacion_lat, self.ubicacion_lng)
-        return None
-    
-    @ubicacion.setter
-    def ubicacion(self, value):
-        # Permitir asignar un Point o None
-        if value is None:
-            self.ubicacion_lat = None
-            self.ubicacion_lng = None
-        elif hasattr(value, 'y') and hasattr(value, 'x'):
-            self.ubicacion_lat = value.y
-            self.ubicacion_lng = value.x
+    # (Propiedades eliminadas ya que 'ubicacion' ahora es un campo real)
     
     # Estado y seguimiento
     estado = models.CharField(
@@ -113,6 +106,47 @@ class Reporte(models.Model):
         default='nuevo'
     )
     notas_internas = models.TextField(blank=True)
+    
+    # Priorización y gestión
+    PRIORIDAD_CHOICES = [
+        ('baja', 'Baja'),
+        ('normal', 'Normal'),
+        ('alta', 'Alta'),
+        ('urgente', 'Urgente'),
+    ]
+    prioridad = models.CharField(
+        max_length=20,
+        choices=PRIORIDAD_CHOICES,
+        default='normal'
+    )
+    prioridad_calculada = models.FloatField(default=0.0, db_index=True)  # Score calculado automáticamente
+    tags = models.ManyToManyField('Tag', blank=True, related_name='reportes')
+    
+    # Validación y calidad
+    score_confianza = models.FloatField(default=1.0)  # Score de confianza (0-1)
+    es_spam = models.BooleanField(default=False)
+    validado = models.BooleanField(default=False)
+    validado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reportes_validados'
+    )
+    fecha_validacion = models.DateTimeField(null=True, blank=True)
+    
+    # Geocodificación
+    direccion_completa = models.TextField(blank=True)  # Dirección completa obtenida por geocodificación inversa
+    
+    # SLA y tiempos
+    fecha_limite_resolucion = models.DateTimeField(null=True, blank=True)
+    tiempo_resolucion_horas = models.FloatField(null=True, blank=True)  # Tiempo real de resolución
+    sla_ultima_alerta = models.DateTimeField(null=True, blank=True)
+    sla_escalado = models.BooleanField(default=False)
+    sla_escalado_at = models.DateTimeField(null=True, blank=True)
+    
+    # Colaboración Ciudadana
+    validaciones_ciudadanas = models.IntegerField(default=0) # Cantidad de "Lo veo también"
     
     # Auditoría
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -131,6 +165,8 @@ class Reporte(models.Model):
         blank=True,
         related_name='reportes_asignados'
     )
+    history = HistoricalRecords()
+
     
     def __str__(self):
         return f"{self.codigo_seguimiento} - {self.categoria.nombre if self.categoria else 'Sin categoría'}"
@@ -143,12 +179,64 @@ class Reporte(models.Model):
             models.Index(fields=['codigo_seguimiento']),
             models.Index(fields=['estado']),
             models.Index(fields=['fecha_creacion']),
+            models.Index(fields=['prioridad']),
+            models.Index(fields=['prioridad_calculada']),
+            models.Index(fields=['es_spam']),
+            models.Index(fields=['validado']),
             # Índices compuestos para consultas frecuentes
-            models.Index(fields=['estado', 'fecha_creacion'], name='reporte_estado_fecha_idx'),
-            models.Index(fields=['categoria', 'estado'], name='reporte_categoria_estado_idx'),
-            models.Index(fields=['ubicacion_lat', 'ubicacion_lng'], name='reporte_ubicacion_idx'),
-            models.Index(fields=['asignado_a', 'estado'], name='reporte_asignado_estado_idx'),
+            models.Index(fields=['estado', 'fecha_creacion'], name='rpt_estado_fecha_idx'),
+            models.Index(fields=['categoria', 'estado'], name='rpt_cat_estado_idx'),
+            # Índice espacial es automático en PointField
+            # models.Index(fields=['ubicacion_lat', 'ubicacion_lng'], name='rpt_ubicacion_idx'),
+            models.Index(fields=['asignado_a', 'estado'], name='rpt_asig_estado_idx'),
+            models.Index(fields=['prioridad_calculada', 'estado'], name='rpt_prio_estado_idx'),
+            models.Index(fields=['asignado_a', 'estado', 'prioridad_calculada'], name='rpt_asig_est_prio_idx'),
         ]
+
+
+
+class ReporteImagen(models.Model):
+    """Imágenes adicionales para un reporte"""
+    reporte = models.ForeignKey(
+        Reporte,
+        on_delete=models.CASCADE,
+        related_name='imagenes'
+    )
+    imagen = models.ImageField(upload_to='reportes_galeria/')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Imagen de {self.reporte.codigo_seguimiento}"
+
+    class Meta:
+        verbose_name = 'Imagen de Reporte'
+        verbose_name_plural = 'Imágenes de Reporte'
+
+
+class CierreReporte(models.Model):
+    """Evidencia obligatoria al cierre/resolución de un reporte"""
+    reporte = models.OneToOneField(
+        Reporte,
+        on_delete=models.CASCADE,
+        related_name='cierre'
+    )
+    evidencia_texto = models.TextField(blank=True)
+    foto_cierre = models.ImageField(upload_to='reportes_cierre/', blank=True, null=True)
+    cerrado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cierres_registrados'
+    )
+    fecha_cierre = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Cierre {self.reporte.codigo_seguimiento}"
+
+    class Meta:
+        verbose_name = 'Cierre de Reporte'
+        verbose_name_plural = 'Cierres de Reportes'
 
 
 class Notificacion(models.Model):
@@ -171,3 +259,106 @@ class Notificacion(models.Model):
         verbose_name_plural = 'Notificaciones'
         ordering = ['-fecha_creacion']
 
+
+class Tag(models.Model):
+    """Etiquetas para categorizar reportes de forma flexible"""
+    nombre = models.CharField(max_length=50, unique=True)
+    color = models.CharField(max_length=7, default='#3498db')  # Color en hex
+    descripcion = models.TextField(blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return self.nombre
+    
+    class Meta:
+        verbose_name = 'Tag'
+        verbose_name_plural = 'Tags'
+        ordering = ['nombre']
+
+
+class HistorialCambio(models.Model):
+    """Registro de todos los cambios realizados en un reporte"""
+    TIPO_CAMBIO_CHOICES = [
+        ('estado', 'Cambio de Estado'),
+        ('asignacion', 'Asignación'),
+        ('notas', 'Notas Internas'),
+        ('prioridad', 'Prioridad'),
+        ('tags', 'Tags'),
+        ('ubicacion', 'Ubicación'),
+        ('categoria', 'Categoría'),
+        ('descripcion', 'Descripción'),
+        ('validacion', 'Validación'),
+    ]
+    
+    reporte = models.ForeignKey(
+        Reporte,
+        on_delete=models.CASCADE,
+        related_name='historial'
+    )
+    tipo_cambio = models.CharField(max_length=20, choices=TIPO_CAMBIO_CHOICES)
+    valor_anterior = models.TextField(blank=True, null=True)
+    valor_nuevo = models.TextField(blank=True, null=True)
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='cambios_realizados'
+    )
+    fecha_cambio = models.DateTimeField(auto_now_add=True)
+    notas = models.TextField(blank=True)
+    
+    def __str__(self):
+        return f"{self.reporte.codigo_seguimiento} - {self.get_tipo_cambio_display()} - {self.fecha_cambio}"
+    
+    class Meta:
+        verbose_name = 'Historial de Cambio'
+        verbose_name_plural = 'Historial de Cambios'
+        ordering = ['-fecha_cambio']
+        indexes = [
+            models.Index(fields=['reporte', '-fecha_cambio']),
+            models.Index(fields=['tipo_cambio', '-fecha_cambio']),
+        ]
+
+
+class ComentarioPublico(models.Model):
+    """Comentarios públicos que los ciudadanos pueden agregar a reportes"""
+    reporte = models.ForeignKey(
+        Reporte,
+        on_delete=models.CASCADE,
+        related_name='comentarios_publicos'
+    )
+    nombre = models.CharField(max_length=100)
+    email = models.EmailField(blank=True)
+    comentario = models.TextField()
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    moderado = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return f"Comentario en {self.reporte.codigo_seguimiento} por {self.nombre}"
+    
+    class Meta:
+        verbose_name = 'Comentario Público'
+        verbose_name_plural = 'Comentarios Públicos'
+        ordering = ['-fecha_creacion']
+
+
+class BusquedaGuardada(models.Model):
+    """Búsquedas guardadas por usuarios"""
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name='busquedas_guardadas'
+    )
+    nombre = models.CharField(max_length=100)
+    parametros = models.JSONField()  # Guarda los parámetros de búsqueda
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_ultimo_uso = models.DateTimeField(auto_now=True)
+    veces_usado = models.IntegerField(default=0)
+    
+    def __str__(self):
+        return f"{self.nombre} - {self.usuario.username}"
+    
+    class Meta:
+        verbose_name = 'Búsqueda Guardada'
+        verbose_name_plural = 'Búsquedas Guardadas'
+        ordering = ['-fecha_ultimo_uso']

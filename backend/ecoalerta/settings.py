@@ -22,12 +22,12 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-eccalerta-dev-key-change-i
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
-
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,28 +39,30 @@ INSTALLED_APPS = [
 # NO usar django.contrib.gis - causa errores con GDAL en Azure
 # Agregar el resto de las apps
 INSTALLED_APPS.extend([
+    'django.contrib.gis',  # Enabled for PostGIS
     'rest_framework',
     'rest_framework_simplejwt',  # JWT authentication
     'drf_spectacular',  # API documentation
     'corsheaders',  # CORS support
     'whitenoise.runserver_nostatic',  # WhiteNoise para servir archivos estáticos
+    'channels',
     'reportes',
+    'axes',
+    'simple_history',
 ])
 
 MIDDLEWARE = [
-    # SecurityMiddleware DESACTIVADO completamente - está causando bucles de redirección
-    # 'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'ecoalerta.middleware.DisableCSRFForAPI',  # Desactivar CSRF para API
+    'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    # CommonMiddleware DESACTIVADO temporalmente - está causando redirecciones 301
-    # 'django.middleware.common.CommonMiddleware',
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'axes.middleware.AxesMiddleware',
+    'simple_history.middleware.HistoryRequestMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'ecoalerta.middleware.PreventRedirectsMiddleware',  # Prevenir redirecciones en API (ÚLTIMO - intercepta después de todos)
 ]
 
 ROOT_URLCONF = 'ecoalerta.urls'
@@ -82,42 +84,58 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'ecoalerta.wsgi.application'
+ASGI_APPLICATION = "ecoalerta.asgi.application"
+
+# Configuración de Channels (WebSockets)
+if DEBUG:
+    # En desarrollo local sin docker, usar memoria
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer"
+        }
+    }
+else:
+    # En producción o si se especifica Redis
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')],
+            },
+        },
+    }
 
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Azure PostgreSQL - Usando PostgreSQL estándar (NO PostGIS)
-# IMPORTANTE: Forzar ENGINE explícitamente como PostgreSQL estándar
-# Aunque instalamos GDAL/GEOS, NO usamos PostGIS para evitar problemas
 USE_SQLITE_LOCAL = os.getenv('USE_SQLITE_LOCAL', 'false').lower() in ('1', 'true', 'yes')
+
+db_sslmode = os.getenv('DB_SSLMODE', 'require').strip()
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',  # PostgreSQL estándar, NO PostGIS
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': os.getenv('DB_NAME', 'postgres'),
         'USER': os.getenv('DB_USER', 'administrador'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'Ecoalerta1'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
         'HOST': os.getenv('DB_HOST', 'ecoalerta.postgres.database.azure.com'),
         'PORT': os.getenv('DB_PORT', '5432'),
-        'OPTIONS': {
-            'sslmode': 'require',  # Azure requiere SSL
-        },
+        'OPTIONS': (
+            {'sslmode': db_sslmode} if db_sslmode else {}
+        ),
     }
 }
 
 if USE_SQLITE_LOCAL:
     DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.sqlite3',
+        'ENGINE': 'django.contrib.gis.db.backends.spatialite',
         'NAME': BASE_DIR / 'db.sqlite3',
-}
-
-# Validar que el ENGINE sea correcto (forzar PostgreSQL estándar)
-if not USE_SQLITE_LOCAL and DATABASES['default']['ENGINE'] != 'django.db.backends.postgresql':
-    # Si por alguna razón el ENGINE no es PostgreSQL estándar, forzarlo
-    print(f"⚠️ ADVERTENCIA: ENGINE no es PostgreSQL estándar: {DATABASES['default']['ENGINE']}")
-    print("   Forzando a django.db.backends.postgresql")
-    DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
+    }
+    SPATIALITE_LIBRARY_PATH = os.getenv(
+        'SPATIALITE_LIBRARY_PATH',
+        '/opt/homebrew/opt/libspatialite/lib/mod_spatialite.dylib'
+    )
 
 
 # Password validation
@@ -137,6 +155,21 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# Axes Configuration
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # horas
+AXES_LOCKOUT_TEMPLATE = None # Usar JSON para API
+AXES_LOCKOUT_URL = None
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
+AXES_HANDLER = 'axes.handlers.database.AxesDatabaseHandler'
+
 
 
 # Internationalization
@@ -185,6 +218,16 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'EXCEPTION_HANDLER': 'reportes.exceptions.custom_exception_handler',
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/minute',  # General read API
+        'user': '1000/minute',  # General read API
+        'report_submission_anon': '2/hour',   # Strict submission limit
+        'report_submission_pro': '10/hour',   # Auth submission limit
+    },
 }
 
 # CORS settings
@@ -199,11 +242,11 @@ azure_frontend_url = os.getenv('AZURE_FRONTEND_URL', '')
 if azure_frontend_url:
     CORS_ALLOWED_ORIGINS.append(azure_frontend_url)
 
-# Permitir todos los orígenes solo en desarrollo
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Solo en desarrollo
+# Permitir todos los orígenes solo si se habilita explícitamente en desarrollo
+CORS_ALLOW_ALL_ORIGINS = DEBUG and os.getenv('CORS_ALLOW_ALL', 'False').lower() in ('1', 'true', 'yes')
 CORS_ALLOW_CREDENTIALS = True
 
-# Configuración adicional de CORS para evitar problemas
+# Configuración adicional de CORS
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -225,7 +268,7 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-# Desactivar CSRF para API endpoints (Django REST Framework maneja esto)
+# DRF maneja CSRF por autenticación (por ejemplo SessionAuthentication)
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS.copy()
 if azure_frontend_url:
     CSRF_TRUSTED_ORIGINS.append(azure_frontend_url)
@@ -236,36 +279,21 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Custom user model
 AUTH_USER_MODEL = 'reportes.Usuario'
 
-# GDAL/GEOS NO configurado - no usar PostGIS por ahora
-# Se eliminó toda configuración de GDAL para evitar errores de importación
-
-# Configuración de seguridad para producción
-# Azure App Service maneja HTTPS a través de un proxy inverso
-# NO redirigir a HTTPS porque Azure ya lo maneja y puede causar bucles
-SECURE_SSL_REDIRECT = False
-
-# IMPORTANTE: Desactivar todas las redirecciones relacionadas con SSL/HTTPS
-# Azure App Service ya maneja HTTPS, no necesitamos que Django redirija
-SECURE_HSTS_SECONDS = 0
-SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-SECURE_HSTS_PRELOAD = False
-
-# Configuración de proxy headers para Azure App Service
-# Necesarios para que Django detecte HTTPS correctamente cuando está detrás del proxy de Azure
-# Solo activar en producción (Azure) para evitar problemas en desarrollo
-if not DEBUG:
-    USE_X_FORWARDED_HOST = True
-    USE_X_FORWARDED_PORT = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-else:
-    # En desarrollo, no usar proxy headers
-    USE_X_FORWARDED_HOST = False
-    USE_X_FORWARDED_PORT = False
-    SECURE_PROXY_SSL_HEADER = None
-
-# Desactivar completamente las redirecciones de seguridad
-# Esto evita que SecurityMiddleware redirija requests
-FORCE_SCRIPT_NAME = None
+# Configuración de seguridad base
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = not DEBUG
+USE_X_FORWARDED_PORT = not DEBUG
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() in ('1', 'true', 'yes')
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() in ('1', 'true', 'yes')
+SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'False').lower() in ('1', 'true', 'yes')
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'same-origin'
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # APPEND_SLASH desactivado para evitar redirecciones en API
 # Las URLs de API deben manejarse explícitamente sin redirecciones
@@ -273,13 +301,6 @@ APPEND_SLASH = False
 
 # Desactivar redirecciones automáticas para evitar problemas en Azure
 PREPEND_WWW = False
-
-if not DEBUG:
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
 
 # JWT Configuration
 from datetime import timedelta
@@ -386,6 +407,40 @@ LOGGING = {
         },
     },
 }
+
+# Configuración de Email
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@ecoalerta.cl')
+
+# Configuración de Celery
+# Configuración de Celery
+if DEBUG:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+    CELERY_BROKER_URL = 'memory://'
+    CELERY_RESULT_BACKEND = 'db+sqlite:///results.sqlite'
+else:
+    CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0'))
+    CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0'))
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutos
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutos
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_TASK_ACKS_LATE = True
+
+# Configuración de Celery Beat (tareas programadas)
+from reportes.celerybeat_schedule import CELERY_BEAT_SCHEDULE
+CELERY_BEAT_SCHEDULE = CELERY_BEAT_SCHEDULE
 
 # Validación de variables de entorno críticas en producción
 if not DEBUG:

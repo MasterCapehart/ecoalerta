@@ -1,482 +1,578 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
-import 'leaflet/dist/leaflet.css'
-import './ReporteForm.css'
-import logo from '../assets/images/Ecoalerta-logo-min.png'
-import { API_ROUTES } from '../config'
-import apiClient from '../services/api'
-import { toast } from './ToastContainer'
 
-// Fix para iconos de Leaflet en React
+import React, { useState, useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, useMapEvents, ZoomControl } from 'react-leaflet'
+import { MapPin, Check, AlertTriangle, Trash2, Info, Upload, Lock } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
-delete L.Icon.Default.prototype._getIconUrl
+import 'leaflet/dist/leaflet.css'
+import { useForm, Controller } from 'react-hook-form'
+import apiClient, { API_ROUTES } from '../services/api'
+import { toast } from './ToastContainer'
+import OfflineService from '../services/OfflineService'
+import AIService from '../services/AIService'
+import './ReporteForm.css'
+
+// Custom Icon for Leaflet
+delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-})
+});
 
-function MapClickHandler({ onLocationSelect, onMapReady }) {
-  const map = useMapEvents({
-    click(e) {
-      onLocationSelect(e.latlng)
-    },
-  })
-
+// Helper component to move map
+const MapUpdater = ({ center }) => {
+  const map = useMapEvents({})
   useEffect(() => {
-    if (onMapReady && map) {
-      onMapReady(map)
-    }
-  }, [onMapReady, map])
-
+    if (center) map.flyTo(center, 15)
+  }, [center, map])
   return null
 }
 
-function ReporteForm() {
-  const [ubicacion, setUbicacion] = useState(null)
+const ReporteForm = () => {
   const navigate = useNavigate()
-  const [categoria, setCategoria] = useState('')
-  const [descripcion, setDescripcion] = useState('')
-  const [foto, setFoto] = useState(null)
-  const [fotoPreview, setFotoPreview] = useState(null)
-  const [email, setEmail] = useState('')
-  const [showModal, setShowModal] = useState(false)
-  const [codigoSeguimiento, setCodigoSeguimiento] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm({
+    defaultValues: {
+      categoria: '',
+      ubicacion: null,
+      direccion: '',
+      fotos: [],
+      descripcion: '',
+      email: ''
+    }
+  })
+
+  // State local para UI no relacionada con el formulario en sí o datos externos
   const [categorias, setCategorias] = useState([])
-  const [errors, setErrors] = useState({})
-  const [isDragging, setIsDragging] = useState(false)
-  const [mapInstance, setMapInstance] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [codigoSeguimiento, setCodigoSeguimiento] = useState(null)
+  const [mapCenter, setMapCenter] = useState([-29.95, -71.33])
+  const [aiSuggestion, setAiSuggestion] = useState(null)
+  const [duplicateCheck, setDuplicateCheck] = useState({
+    loading: false,
+    found: false,
+    count: 0,
+    duplicates: [],
+    radius: 50
+  })
+  const [confirmDuplicate, setConfirmDuplicate] = useState(false)
 
-  const handleLocationSelect = (latlng) => {
-    setUbicacion(latlng)
-    setErrors(prev => ({ ...prev, ubicacion: '' }))
-  }
+  // Mantenemos previews separado porque no se envía al backend, es solo visual
+  const [fotoPreviews, setFotoPreviews] = useState([])
 
-  const handleFotoChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      // Validar tamaño (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('La imagen es demasiado grande. Máximo 5MB')
-        return
-      }
-      // Validar tipo
-      if (!file.type.startsWith('image/')) {
-        toast.error('Por favor selecciona una imagen válida')
-        return
-      }
-      setFoto(file)
-      setErrors(prev => ({ ...prev, foto: '' }))
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setFotoPreview(reader.result)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
+  // Watch values for conditional rendering/logic
+  const ubicacion = watch('ubicacion')
+  const fotos = watch('fotos')
+  const direccion = watch('direccion')
 
-  const handleDragOver = (e) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (e) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    setIsDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('La imagen es demasiado grande. Máximo 5MB')
-        return
-      }
-      if (!file.type.startsWith('image/')) {
-        toast.error('Por favor selecciona una imagen válida')
-        return
-      }
-      setFoto(file)
-      setErrors(prev => ({ ...prev, foto: '' }))
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setFotoPreview(reader.result)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleLocateMe = () => {
-    if (!navigator.geolocation) {
-      toast.error('Tu navegador no soporta geolocalización')
-      return
-    }
-
-    if (!mapInstance) {
-      toast.error('El mapa aún se está cargando, intenta de nuevo en un momento')
-      return
-    }
-
-    const successHandler = (position) => {
-      const { latitude, longitude } = position.coords
-      const latlng = { lat: latitude, lng: longitude }
-
-      mapInstance.flyTo([latitude, longitude], 16, {
-        duration: 1.5,
+  const checkPotentialDuplicates = async (lat, lng) => {
+    if (!lat || !lng) return
+    setDuplicateCheck(prev => ({ ...prev, loading: true }))
+    try {
+      const response = await apiClient.get(API_ROUTES.REPORTES_VERIFICAR_DUPLICADOS, {
+        params: { lat, lng, radio: 60 }
       })
-
-      handleLocationSelect(latlng)
-      toast.info('Ubicación actual detectada')
+      const data = response.data || {}
+      setDuplicateCheck({
+        loading: false,
+        found: Boolean(data.found),
+        count: data.count || 0,
+        duplicates: Array.isArray(data.duplicates) ? data.duplicates : [],
+        radius: data.radius_meters || 60
+      })
+      if (data.found) {
+        toast.warning(`Detectamos ${data.count} reporte(s) cercano(s). Revisa antes de enviar.`)
+      }
+    } catch (error) {
+      console.error('Error verificando duplicados:', error)
+      setDuplicateCheck({
+        loading: false,
+        found: false,
+        count: 0,
+        duplicates: [],
+        radius: 60
+      })
     }
-
-    const fallbackLocateByIP = async () => {
-      try {
-        toast.info('Intentando ubicación aproximada por IP...')
-        const response = await fetch('https://ipapi.co/json/')
-        if (!response.ok) {
-          throw new Error('Respuesta inválida del servicio de geolocalización por IP')
-        }
-        const data = await response.json()
-        const latitude = parseFloat(data.latitude)
-        const longitude = parseFloat(data.longitude)
-
-        if (!latitude || !longitude) {
-          throw new Error('Sin coordenadas válidas desde IP')
-        }
-
-        const latlng = { lat: latitude, lng: longitude }
-
-        mapInstance.flyTo([latitude, longitude], 12, {
-          duration: 1.5,
-        })
-
-        handleLocationSelect(latlng)
-        toast.success('Usando ubicación aproximada por IP')
-      } catch (error) {
-        console.error('Error al obtener ubicación por IP:', error)
-        toast.error('Tu dispositivo no pudo calcular tu ubicación. Verifica que tengas activada la ubicación en Windows y conexión a internet.')
-      }
-    }
-
-    const errorHandler = (error) => {
-      console.error('Error de geolocalización:', error)
-
-      if (error.code === error.PERMISSION_DENIED) {
-        toast.error('Permiso de ubicación denegado. Activa los permisos en tu navegador.')
-        return
-      }
-
-      if (error.code === error.POSITION_UNAVAILABLE || error.code === error.TIMEOUT) {
-        // Fallback a ubicación aproximada por IP
-        fallbackLocateByIP()
-        return
-      }
-
-      toast.error('Ocurrió un error al obtener tu ubicación.')
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      successHandler,
-      errorHandler,
-      {
-        enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 0,
-      }
-    )
   }
 
-  const validateEmail = (email) => {
-    if (!email) return true // Email es opcional
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return re.test(email)
-  }
-
-  // Cargar categorías al montar el componente
   useEffect(() => {
     const fetchCategorias = async () => {
       try {
         const response = await apiClient.get(API_ROUTES.CATEGORIAS)
         const data = response.data
-        setCategorias(Array.isArray(data) ? data : data.results || [])
-      } catch (error) {
-        console.error('Error al cargar categorías:', error)
-        toast.error('Error al cargar las categorías')
+        setCategorias(Array.isArray(data) ? data : (data.results || []))
+      } catch {
+        setCategorias([
+          { id: 1, nombre: 'Residuos Domésticos' },
+          { id: 2, nombre: 'Escombros' },
+          { id: 3, nombre: 'Voluminosos' },
+          { id: 4, nombre: 'Peligrosos' }
+        ])
       }
     }
     fetchCategorias()
+
+    // Geolocate on load
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords
+          setMapCenter([latitude, longitude])
+        },
+        () => { }
+      )
+    }
   }, [])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    
-    const newErrors = {}
-    
-    if (!ubicacion) {
-      newErrors.ubicacion = 'Por favor, selecciona una ubicación en el mapa'
-    }
+  const MapClickHandler = () => {
+    useMapEvents({
+      click: async (e) => {
+        const { lat, lng } = e.latlng
+        setValue('ubicacion', { lat, lng }, { shouldValidate: true })
+        setConfirmDuplicate(false)
+        checkPotentialDuplicates(lat, lng)
 
-    if (!categoria) {
-      newErrors.categoria = 'Por favor, selecciona una categoría'
-    }
+        try {
+          const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+          const data = await resp.json()
+          if (data.display_name) setValue('direccion', data.display_name)
+        } catch { /* ignore */ }
+      }
+    })
+    return null
+  }
 
-    if (!foto) {
-      newErrors.foto = 'Por favor, selecciona una fotografía'
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocalización no soportada')
+      return
     }
-
-    if (email && !validateEmail(email)) {
-      newErrors.email = 'Por favor, ingresa un email válido'
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
-      Object.values(newErrors).forEach(error => toast.error(error))
-      setLoading(false)
+    if (!window.isSecureContext) {
+      toast.error('La geolocalización requiere un contexto seguro (https o localhost).')
       return
     }
 
-    setErrors({})
+    toast.info('Obteniendo ubicación actual...')
+    setLoading(true)
+    const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
 
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        setMapCenter([latitude, longitude])
+        setValue('ubicacion', { lat: latitude, lng: longitude }, { shouldValidate: true })
+        setConfirmDuplicate(false)
+        checkPotentialDuplicates(latitude, longitude)
+        toast.info('Ubicación actualizada')
+        setLoading(false)
+      },
+      (err) => {
+        console.warn(err)
+        if (err?.code === 1) {
+          toast.error('Permiso de ubicación denegado. Habilítalo en el navegador.')
+        } else if (err?.code === 2) {
+          toast.error('No se pudo determinar tu ubicación actual.')
+        } else if (err?.code === 3) {
+          toast.error('Tiempo de espera agotado al obtener ubicación.')
+        } else {
+          toast.error('Error al obtener ubicación. Revisa permisos.')
+        }
+        setLoading(false)
+      },
+      options
+    )
+  }
+
+  const handlePhotoUpload = async (files) => {
+    if (!files || files.length === 0) return
+    const fileList = Array.from(files)
+    const validFiles = []
+
+    // Current photos from state
+    const currentFotos = fotos || []
+    const newPreviews = [...fotoPreviews]
+
+    if (currentFotos.length + fileList.length > 5) {
+      toast.warning('Máximo 5 fotos permitidas')
+      return
+    }
+
+    fileList.forEach(file => {
+      if (!file.type.startsWith('image/')) return
+      validFiles.push(file)
+      newPreviews.push(URL.createObjectURL(file))
+    })
+
+    if (validFiles.length > 0) {
+      const updatedFotos = [...currentFotos, ...validFiles]
+      setValue('fotos', updatedFotos, { shouldValidate: true })
+      setFotoPreviews(newPreviews)
+
+      // AI Classification Logic
+      try {
+        const img = document.createElement('img')
+        img.src = URL.createObjectURL(validFiles[0])
+        img.onload = async () => {
+          const suggestion = await AIService.classifyImage(img)
+          if (suggestion) {
+            setAiSuggestion(suggestion)
+            toast.info(`💡 Sugerencia IA: Parece ser ${suggestion.categoryName}`)
+          }
+        }
+      } catch (error) {
+        console.error("AI Error:", error)
+      }
+    }
+  }
+
+  const removePhoto = (index) => {
+    const currentFotos = [...(fotos || [])]
+    const currentPreviews = [...fotoPreviews]
+
+    currentFotos.splice(index, 1)
+    currentPreviews.splice(index, 1)
+
+    setValue('fotos', currentFotos, { shouldValidate: true })
+    setFotoPreviews(currentPreviews)
+  }
+
+  const onSubmit = async (data) => {
+    setLoading(true)
     try {
       const formData = new FormData()
-      formData.append('categoria', categoria)
-      formData.append('descripcion', descripcion)
-      if (email) formData.append('email', email)
-      if (foto) formData.append('foto', foto)
-      formData.append('lat', ubicacion.lat)
-      formData.append('lng', ubicacion.lng)
+      formData.append('categoria', data.categoria)
+      formData.append('lat', data.ubicacion.lat)
+      formData.append('lng', data.ubicacion.lng)
+      if (data.descripcion) formData.append('descripcion', data.descripcion)
+      if (data.email) formData.append('email', data.email)
+      if (data.direccion) formData.append('direccion', data.direccion)
+
+      if (data.fotos.length > 0) {
+        formData.append('foto', data.fotos[0])
+        for (let i = 1; i < data.fotos.length; i++) {
+          formData.append('fotos_adicionales', data.fotos[i])
+        }
+      }
+
+      if (duplicateCheck.found && !confirmDuplicate) {
+        toast.warning('Hay posibles duplicados. Marca la confirmación para continuar.')
+        setLoading(false)
+        return
+      }
+      if (confirmDuplicate) {
+        formData.append('permitir_duplicado', 'true')
+      }
 
       const response = await apiClient.post(API_ROUTES.REPORTES, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' }
       })
 
-      const data = response.data
+      setCodigoSeguimiento(response.data.codigo_seguimiento)
+      setShowSuccessModal(true)
 
-      if (data.codigo_seguimiento) {
-        setCodigoSeguimiento(data.codigo_seguimiento)
-        setShowModal(true)
-        toast.success('Reporte enviado exitosamente')
-      } else {
-        toast.error(data.error || 'Error al enviar el reporte')
-      }
     } catch (error) {
-      console.error('Error al enviar reporte:', error)
-      toast.error('Error al conectar con el servidor. Verifica que el backend esté corriendo.')
+      if (!navigator.onLine) {
+        await OfflineService.saveReport({
+          categoria: data.categoria,
+          lat: data.ubicacion.lat,
+          lng: data.ubicacion.lng,
+          descripcion: data.descripcion,
+          email: data.email,
+          direccion: data.direccion,
+        })
+        setCodigoSeguimiento('PENDIENTE-SYNC')
+        setShowSuccessModal(true)
+      } else {
+        toast.error('Error al enviar reporte')
+        console.error(error)
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  const resetForm = () => {
-    setUbicacion(null)
-    setCategoria('')
-    setDescripcion('')
-    setFoto(null)
-    setFotoPreview(null)
-    setEmail('')
-    setShowModal(false)
+  const handleReset = () => {
+    reset()
+    setFotoPreviews([])
+    setAiSuggestion(null)
+    setShowSuccessModal(false)
+    setCodigoSeguimiento(null)
   }
 
   return (
-    <>
-      <div className="container">
-        <div className="header">
-          <img src={logo} alt="logo-ecoalerta" />
-          <button 
-              onClick={() => navigate('/login')}
-              className="back-button"
-          >
-              ← Volver
-          </button>
+    <div className="report-page">
+      {/* Header Banner */}
+      <div className="header-banner">
+        <div className="logo-section">
+          <div className="logo-icon">
+            <MapPin size={24} fill="currentColor" />
+          </div>
+          <div className="brand-text">
+            <div className="brand-title">
+              ECO <span className="highlight">ALERTA</span>
+            </div>
+            <div className="brand-slogan">
+              RADAR INTELIGENTE, CIUDAD SOSTENIBLE
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/login')}
+          style={{
+            marginLeft: 'auto',
+            background: 'rgba(255, 255, 255, 0.2)',
+            border: '1px solid rgba(255, 255, 255, 0.5)',
+            color: '#fff',
+            borderRadius: '8px',
+            padding: '8px 14px',
+            cursor: 'pointer',
+            fontWeight: 600
+          }}
+        >
+          Iniciar sesión
+        </button>
+      </div>
+
+      <div className="report-content">
+        {/* Left: Map */}
+        <div className="map-container">
+          <div className={`map-view ${errors.ubicacion ? 'has-error' : ''}`}>
+            <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; OpenStreetMap'
+              />
+              <ZoomControl position="topleft" />
+              <MapUpdater center={mapCenter} />
+              <MapClickHandler />
+              {ubicacion && (
+                <Marker position={[ubicacion.lat, ubicacion.lng]} />
+              )}
+            </MapContainer>
+
+            {ubicacion && (
+              <div className="map-controls-overlay">
+                <div className="location-badge">
+                  <Check size={14} /> Ubicación seleccionada
+                </div>
+              </div>
+            )}
+
+            <button className="btn-use-location" onClick={handleGetCurrentLocation} type="button">
+              <MapPin size={16} color="#d32f2f" fill="#d32f2f" />
+              Usar mi ubicación
+            </button>
+          </div>
+          {errors.ubicacion && <span className="error-text">Debes seleccionar una ubicación en el mapa</span>}
+
+          {ubicacion && (
+            <div className="coords-bar">
+              <span>Lat: {ubicacion.lat.toFixed(6)}, Lng: {ubicacion.lng.toFixed(6)}</span>
+              <Check size={16} />
+            </div>
+          )}
+
+          {duplicateCheck.loading && (
+            <div className="duplicate-warning duplicate-warning--loading">
+              Verificando reportes cercanos...
+            </div>
+          )}
+
+          {!duplicateCheck.loading && duplicateCheck.found && (
+            <div className="duplicate-warning">
+              <div className="duplicate-warning__title">
+                <AlertTriangle size={16} />
+                Posible duplicado detectado ({duplicateCheck.count})
+              </div>
+              <p className="duplicate-warning__text">
+                Encontramos reportes activos en un radio aproximado de {duplicateCheck.radius}m.
+              </p>
+              <ul className="duplicate-warning__list">
+                {duplicateCheck.duplicates.slice(0, 3).map((rep) => (
+                  <li key={rep.id || rep.codigo_seguimiento}>
+                    <strong>{rep.codigo_seguimiento || `#${rep.id}`}</strong> · {rep.categoria_nombre || 'Sin categoría'} · {rep.estado}
+                  </li>
+                ))}
+              </ul>
+              <label className="duplicate-warning__confirm">
+                <input
+                  type="checkbox"
+                  checked={confirmDuplicate}
+                  onChange={(e) => setConfirmDuplicate(e.target.checked)}
+                />
+                Confirmo que deseo enviar este reporte de todas formas.
+              </label>
+            </div>
+          )}
+
+          <div className="address-bar">
+            <MapPin size={16} color="#d32f2f" />
+            <span>{direccion || "La Serena, Región de Coquimbo, Chile"}</span>
+          </div>
         </div>
 
-        <div className="form-section">
-          {/* Mapa */}
-          <div className="map-container">
-            <div className="map-wrapper">
-              <MapContainer
-                center={[-29.9533, -71.3395]}
-                zoom={12}
-                style={{ height: '400px', width: '100%', borderRadius: '20px' }}
-              >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; OpenStreetMap contributors'
-                />
-                <MapClickHandler 
-                  onLocationSelect={handleLocationSelect} 
-                  onMapReady={setMapInstance}
-                />
-                {ubicacion && <Marker position={[ubicacion.lat, ubicacion.lng]} />}
-              </MapContainer>
-              <button
-                type="button"
-                className="locate-button"
-                onClick={handleLocateMe}
-              >
-                <span className="locate-icon">📌</span>
-                <span className="locate-label">Usar mi ubicación</span>
-              </button>
-              {ubicacion && (
-                <div className="map-accuracy-indicator">
-                  <span className="accuracy-icon">📍</span>
-                  <span className="accuracy-text">Ubicación seleccionada</span>
-                </div>
-              )}
-            </div>
-            <div className={`map-coordinates ${errors.ubicacion ? 'error' : ''} ${ubicacion ? 'has-location' : ''}`}>
-              <input
-                type="text"
-                value={ubicacion ? `Lat: ${ubicacion.lat.toFixed(6)}, Lng: ${ubicacion.lng.toFixed(6)}` : ''}
-                placeholder="Haz clic en el mapa para seleccionar ubicación"
-                readOnly
-              />
-              {ubicacion && <span className="location-check">✓</span>}
-            </div>
-            {errors.ubicacion && <span className="error-message">{errors.ubicacion}</span>}
-          </div>
+        {/* Right: Form */}
+        <div className="form-container">
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <div className="form-group">
+              <label className="form-label">
+                <span className="text-gray-600">Fotografía del vertedero *</span>
+              </label>
 
-          {/* Formulario */}
-          <div className="form-container">
-            <form onSubmit={handleSubmit}>
-              {/* Fotografía */}
-              <div className="form-group">
-                <label>Fotografía del vertedero *</label>
-                <div 
-                  className={`file-input-wrapper ${isDragging ? 'dragging' : ''} ${errors.foto ? 'error' : ''} ${foto ? 'has-file' : ''}`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <input
-                    type="file"
-                    id="foto"
-                    accept="image/*"
-                    onChange={handleFotoChange}
-                    required
-                  />
-                  <label htmlFor="foto" className="file-input-label">
-                    {foto ? (
-                      <>
-                        <span className="file-icon">✅</span>
-                        <span className="file-name">{foto.name}</span>
-                        <span className="file-size">({(foto.size / 1024 / 1024).toFixed(2)} MB)</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="file-icon">📷</span>
-                        <span>Arrastra una imagen aquí o haz clic para seleccionar</span>
-                      </>
-                    )}
-                  </label>
+              <label className={`upload-box ${errors.fotos ? 'error-border' : ''}`}>
+                <div className="upload-placeholder">
+                  <div className="upload-icon-circle">
+                    <Upload size={16} strokeWidth={3} />
+                  </div>
+                  <span>Arrastra una imagen aquí o haz clic para seleccionar</span>
                 </div>
-                {errors.foto && <span className="error-message">{errors.foto}</span>}
-                {fotoPreview && (
-                  <div className="preview-container">
-                    <img src={fotoPreview} alt="Preview" className="preview-image" />
-                    <button 
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handlePhotoUpload(e.target.files)}
+                  hidden
+                />
+              </label>
+              {errors.fotos && <span className="error-text">Al menos una foto es obligatoria</span>}
+
+              <div className="preview-row">
+                {fotoPreviews.map((preview, idx) => (
+                  <div key={idx} style={{ position: 'relative' }}>
+                    <img src={preview} className="preview-thumb" alt="preview" />
+                    <button
                       type="button"
-                      className="remove-image-btn"
-                      onClick={() => {
-                        setFoto(null)
-                        setFotoPreview(null)
-                        setErrors(prev => ({ ...prev, foto: '' }))
+                      onClick={() => removePhoto(idx)}
+                      style={{
+                        position: 'absolute', top: -5, right: -5,
+                        background: 'red', color: 'white',
+                        borderRadius: '50%', border: 'none',
+                        width: 18, height: 18, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                       }}
                     >
-                      ✕
+                      &times;
                     </button>
                   </div>
-                )}
+                ))}
               </div>
+            </div>
 
-              {/* Categoría */}
-              <div className="form-group">
-                <label>Tipo de residuos *</label>
-                <select
-                  value={categoria}
-                  onChange={(e) => {
-                    setCategoria(e.target.value)
-                    setErrors(prev => ({ ...prev, categoria: '' }))
-                  }}
-                  className={errors.categoria ? 'error' : ''}
-                  required
-                >
-                  <option value="">Seleccione una opción</option>
-                  {categorias.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                  ))}
-                </select>
-                {errors.categoria && <span className="error-message">{errors.categoria}</span>}
+            {/* AI Suggestion Chip */}
+            {aiSuggestion && (
+              <div
+                className="ai-suggestion-chip"
+                onClick={() => {
+                  setValue('categoria', aiSuggestion.categoryId, { shouldValidate: true })
+                  setAiSuggestion(null) // Clear after selection
+                  toast.success('Categoría aplicada automáticamente')
+                }}
+                style={{
+                  background: '#e3f2fd',
+                  border: '1px solid #2196f3',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  marginBottom: '15px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  animation: 'fadeIn 0.5s ease-in'
+                }}
+              >
+                <div style={{ fontSize: '24px' }}>🤖</div>
+                <div>
+                  <div style={{ fontWeight: 'bold', color: '#1565c0', fontSize: '14px' }}>
+                    IA Detectó: {aiSuggestion.categoryName}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#546e7a' }}>
+                    Pulsa aquí para clasificar automáticamente
+                  </div>
+                </div>
               </div>
+            )}
 
-              {/* Email */}
-              <div className="form-group">
-                <label>Correo electrónico (opcional)</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value)
-                    if (e.target.value && !validateEmail(e.target.value)) {
-                      setErrors(prev => ({ ...prev, email: 'Email inválido' }))
-                    } else {
-                      setErrors(prev => ({ ...prev, email: '' }))
-                    }
-                  }}
-                  onBlur={(e) => {
-                    if (e.target.value && !validateEmail(e.target.value)) {
-                      setErrors(prev => ({ ...prev, email: 'Email inválido' }))
-                    }
-                  }}
-                  placeholder="tu@email.com"
-                  className={errors.email ? 'error' : ''}
-                />
-                {errors.email && <span className="error-message">{errors.email}</span>}
-                {!errors.email && email && validateEmail(email) && (
-                  <span className="success-message">✓ Email válido</span>
-                )}
-                <p className="help-text">Para recibir notificaciones sobre tu reporte</p>
-              </div>
+            <div className="form-group">
+              <label className="form-label">Tipo de residuos *</label>
+              <select
+                className={`form-control ${errors.categoria ? 'is-invalid' : ''}`}
+                {...register('categoria', { required: 'La categoría es obligatoria' })}
+              >
+                <option value="">Seleccione una opción</option>
+                {categorias.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                ))}
+              </select>
+              {errors.categoria && <span className="error-text">{errors.categoria.message}</span>}
+            </div>
 
-              {/* Descripción */}
-              <div className="form-group">
-                <label>Descripción</label>
-                <textarea
-                  value={descripcion}
-                  onChange={(e) => setDescripcion(e.target.value)}
-                  placeholder="Describe el vertedero (tamaño, tiempo, etc.)"
-                />
-              </div>
+            <div className="form-group">
+              <label className="form-label">Correo electrónico (opcional)</label>
+              <input
+                type="email"
+                className="form-control"
+                placeholder="tu@email.com"
+                {...register('email', {
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: "Dirección de email inválida"
+                  }
+                })}
+              />
+              {errors.email && <span className="error-text">{errors.email.message}</span>}
+              <div className="helper-text">Para recibir notificaciones sobre tu reporte</div>
+            </div>
 
-              <button type="submit" className="btn" disabled={loading}>
-                {loading ? 'Enviando...' : 'Enviar Reporte'}
-              </button>
-            </form>
-          </div>
+            <div className="form-group">
+              <label className="form-label">
+                <Lock size={14} color="#9e9e9e" />
+                Descripción
+              </label>
+              <textarea
+                className="form-control"
+                placeholder="Describe el vertedero (tamaño, tiempo, etc.)"
+                {...register('descripcion')}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn-submit"
+              disabled={loading}
+            >
+              {loading ? 'Enviando...' : 'Enviar Reporte'}
+            </button>
+          </form>
         </div>
       </div>
 
-      {/* Modal de éxito */}
-      {showModal && (
-        <div className="success-modal">
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="modal-overlay">
           <div className="modal-content">
-            <div className="success-icon">✅</div>
-            <h2>¡Reporte Enviado!</h2>
-            <p>Tu reporte ha sido registrado exitosamente</p>
-            <div className="tracking-code">{codigoSeguimiento}</div>
-            <p style={{ marginBottom: '20px' }}>Guarda este código para hacer seguimiento</p>
-            <button className="modal-btn" onClick={resetForm}>Hacer otro reporte</button>
+            <div style={{
+              width: 60, height: 60, borderRadius: '50%', background: '#e8f5e9',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 15px'
+            }}>
+              <Check size={30} color="#2e7d32" />
+            </div>
+            <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10, color: '#1b5e20' }}>¡Reporte Enviado!</h2>
+            <p style={{ color: '#616161', marginBottom: 20 }}>
+              Gracias por tu colaboración.<br />
+              Tu código: <strong style={{ background: '#f5f5f5', padding: '2px 6px' }}>{codigoSeguimiento}</strong>
+            </p>
+            <button
+              onClick={handleReset}
+              className="btn-submit"
+            >
+              Nuevo Reporte
+            </button>
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }
 

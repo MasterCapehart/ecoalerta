@@ -46,3 +46,23 @@ dist/
 build/
 *.egg-info/
 
+# Documentación temporal de mejoras
+INSTRUCCIONES_MEJORAS.md
+INTEGRACION_COMPLETA.md
+MEJORAS_ALTA_PRIORIDAD.md
+MEJORAS_MEDIA_PRIORIDAD.md
+RESUMEN_FRONTEND.md
+RESUMEN_IMPLEMENTACION_MEJORAS.md
+VERIFICACION_INTEGRACION.md
+
+# Celery / Redis
+backend/results.sqlite
+
+# Tests
+frontend/test-results/
+frontend/playwright-report/
+
+
+results.sqlite
+.agents/
+project_features.md.resolved

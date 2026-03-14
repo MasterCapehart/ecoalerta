@@ -19,12 +19,18 @@ function Toast({ message, type = 'info', onClose, duration = 3000 }) {
   }
 
   return (
-    <div className={`toast toast-${type}`}>
+    <div className={`toast toast-${type}`} role="alert" aria-live={type === 'error' ? 'assertive' : 'polite'}>
       <div className="toast-content">
-        <span className="toast-icon">{icons[type] || icons.info}</span>
+        <span className="toast-icon" aria-hidden="true">{icons[type] || icons.info}</span>
         <span className="toast-message">{message}</span>
       </div>
-      <button className="toast-close" onClick={onClose}>×</button>
+      <button 
+        className="toast-close" 
+        onClick={onClose}
+        aria-label="Cerrar notificación"
+      >
+        ×
+      </button>
     </div>
   )
 }

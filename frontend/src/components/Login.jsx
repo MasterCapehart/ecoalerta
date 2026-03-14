@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import apiClient from '../services/api'
 import './Login.css'
@@ -6,19 +6,18 @@ import logo from '../assets/images/logo-green.png'
 import { toast } from './ToastContainer'
 
 function Login() {
-  const [usuario, setUsuario] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting }
+  } = useForm()
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    
+  const onSubmit = async (data) => {
     try {
       const response = await apiClient.post('/api/auth/login/', {
-        username: usuario,
-        password: password,
+        username: data.username,
+        password: data.password,
       })
 
       if (response.data.success) {
@@ -39,9 +38,8 @@ function Login() {
         toast.error(response.data.error || 'Credenciales incorrectas')
       }
     } catch (error) {
-      toast.error(error.message || 'Error al conectar con el servidor')
-    } finally {
-      setLoading(false)
+      const errorMessage = error.response?.data?.error || error.message || 'Error al conectar con el servidor'
+      toast.error(errorMessage)
     }
   }
 
@@ -49,35 +47,63 @@ function Login() {
     <div className="login-container">
       <div className="login-box">
         <div className="login-header">
-          <img src= {logo} alt="green-logo" />
+          <img src={logo} alt="green-logo" />
           <p>Sistema de Monitoreo de Vertederos</p>
         </div>
         
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleSubmit(onSubmit)} role="form" aria-label="Formulario de inicio de sesión">
           <div className="form-group">
-            <label>Usuario</label>
+            <label htmlFor="username">Usuario</label>
             <input
+              id="username"
               type="text"
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
+              {...register('username', {
+                required: 'El usuario es requerido',
+                minLength: {
+                  value: 3,
+                  message: 'El usuario debe tener al menos 3 caracteres'
+                }
+              })}
               placeholder="inspector"
-              required
+              className={errors.username ? 'error' : ''}
+              aria-required="true"
+              aria-invalid={errors.username ? 'true' : 'false'}
+              aria-describedby={errors.username ? 'username-error' : undefined}
             />
+            {errors.username && (
+              <span id="username-error" className="error-message" role="alert" aria-live="polite" style={{color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block'}}>
+                {errors.username.message}
+              </span>
+            )}
           </div>
 
           <div className="form-group">
-            <label>Contraseña</label>
+            <label htmlFor="password">Contraseña</label>
             <input
+              id="password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              {...register('password', {
+                required: 'La contraseña es requerida',
+                minLength: {
+                  value: 4,
+                  message: 'La contraseña debe tener al menos 4 caracteres'
+                }
+              })}
               placeholder="****"
-              required
+              className={errors.password ? 'error' : ''}
+              aria-required="true"
+              aria-invalid={errors.password ? 'true' : 'false'}
+              aria-describedby={errors.password ? 'password-error' : undefined}
             />
+            {errors.password && (
+              <span id="password-error" className="error-message" role="alert" aria-live="polite" style={{color: '#dc3545', fontSize: '12px', marginTop: '4px', display: 'block'}}>
+                {errors.password.message}
+              </span>
+            )}
           </div>
 
-          <button type="submit" className="btn-login" disabled={loading}>
-            <span>{loading ? 'Conectando...' : 'Iniciar Sesión'}</span>
+          <button type="submit" className="btn-login" disabled={isSubmitting} aria-busy={isSubmitting}>
+            <span>{isSubmitting ? 'Conectando...' : 'Iniciar Sesión'}</span>
           </button>
         </form>
 

@@ -1,0 +1,153 @@
+.history-timeline {
+  background: var(--card-bg, #fff);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.history-timeline h3 {
+  margin: 0 0 1.5rem 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.history-timeline.loading,
+.history-timeline.empty {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.timeline-container {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.timeline-container::before {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ddd;
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.timeline-marker {
+  position: absolute;
+  left: -2rem;
+  top: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 2px solid #4CAF50;
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.timeline-icon {
+  font-size: 1rem;
+}
+
+.timeline-content {
+  background: #f9f9f9;
+  border-radius: 6px;
+  padding: 1rem;
+  border-left: 3px solid #4CAF50;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.timeline-type {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.timeline-date {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.timeline-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.timeline-change {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.change-label {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.9rem;
+  min-width: 70px;
+}
+
+.change-value {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.change-value.old {
+  background: #ffebee;
+  color: #c62828;
+  text-decoration: line-through;
+}
+
+.change-value.new {
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.timeline-user {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+.timeline-notes {
+  font-size: 0.85rem;
+  color: #666;
+  font-style: italic;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #eee;
+}
+
+@media (max-width: 768px) {
+  .timeline-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .timeline-change {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .change-label {
+    min-width: auto;
+  }
+}
+

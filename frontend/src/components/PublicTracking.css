@@ -1,0 +1,221 @@
+.public-tracking {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.tracking-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.tracking-header h1 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.tracking-header p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.search-section {
+  margin-bottom: 2rem;
+}
+
+.search-box {
+  display: flex;
+  gap: 1rem;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.search-input {
+  flex: 1;
+  padding: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #4CAF50;
+}
+
+.btn-search {
+  padding: 1rem 2rem;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-search:hover:not(:disabled) {
+  background: #45a049;
+}
+
+.btn-search:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reporte-details {
+  background: var(--card-bg, #fff);
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.reporte-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #eee;
+}
+
+.reporte-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.reporte-title h2 {
+  margin: 0;
+  color: #333;
+}
+
+.estado-badge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.reporte-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  color: #666;
+}
+
+.reporte-section {
+  margin-bottom: 2rem;
+}
+
+.reporte-section h3 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.reporte-section p {
+  color: #666;
+  line-height: 1.6;
+}
+
+.reporte-foto {
+  max-width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.comentarios-list {
+  margin-bottom: 2rem;
+}
+
+.comentario-item {
+  background: #f9f9f9;
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.comentario-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.comentario-date {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.comentario-item p {
+  margin: 0;
+  color: #333;
+}
+
+.no-comentarios {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 2rem;
+}
+
+.comentario-form {
+  background: #f5f5f5;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-top: 1.5rem;
+}
+
+.comentario-form h4 {
+  margin: 0 0 1rem 0;
+  color: #333;
+}
+
+.comentario-form input,
+.comentario-form textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+  font-family: inherit;
+}
+
+.comentario-form textarea {
+  resize: vertical;
+}
+
+.btn-submit {
+  padding: 0.75rem 2rem;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-submit:hover {
+  background: #0b7dda;
+}
+
+@media (max-width: 768px) {
+  .public-tracking {
+    padding: 1rem;
+  }
+
+  .search-box {
+    flex-direction: column;
+  }
+
+  .reporte-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
