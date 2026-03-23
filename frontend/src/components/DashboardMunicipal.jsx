@@ -30,6 +30,8 @@ import MapView3D from './MapView3D'
 import LiveOperationsCenter from './LiveOperationsCenter'
 import DashboardTour from './DashboardTour'
 import EcoInteligenciaTab from './EcoInteligenciaTab'
+import AIService from '../services/AIService'
+import notificationPollingService from '../services/notificationPolling'
 
 // Fix iconos Leaflet
 import L from 'leaflet'
@@ -507,6 +509,10 @@ function DashboardMunicipal() {
   // Estado para el Tour (Onboarding)
   const [runTour, setRunTour] = useState(false)
 
+  // Estados para IA en Detalle
+  const [aiAnalysisResult, setAiAnalysisResult] = useState(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+
   const { lastMessage } = useWebSocket()
 
   // Efecto para procesar mensajes en tiempo real
@@ -928,9 +934,7 @@ function DashboardMunicipal() {
 
   const handleExportExcel = async () => {
     try {
-      const params = {}
       const response = await apiClient.get(API_ROUTES.EXPORTAR_EXCEL, {
-        params,
         responseType: 'blob'
       })
 
@@ -947,6 +951,28 @@ function DashboardMunicipal() {
     } catch (error) {
       console.error('Error al exportar Excel:', error)
       toast.error('Error al exportar Excel')
+    }
+  }
+
+  const handleExportIA = async () => {
+    try {
+      const response = await apiClient.get(API_ROUTES.EXPORTAR_IA_CSV, {
+        responseType: 'blob'
+      })
+
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'inteligencia_residuos_ia.csv')
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+
+      toast.success('Reporte de Inteligencia (B2B) descargado')
+    } catch (error) {
+      console.error('Error al exportar IA CSV:', error)
+      toast.error('Error al generar reporte de inteligencia')
     }
   }
 
@@ -1008,8 +1034,39 @@ function DashboardMunicipal() {
     setModalNotas(reporteDetalle.notas_internas || '')
     setModalEvidenciaCierre(reporteDetalle.cierre?.evidencia_texto || '')
     setModalFotoCierre(null)
+    setAiAnalysisResult(reporteDetalle.ai_metadata?.detailed_analysis || null)
 
     setShowModal(true)
+  }
+
+  const handleAnalizarIA = async () => {
+    if (!reporteSeleccionado || !reporteSeleccionado.foto) return
+    
+    setIsAnalyzing(true)
+    try {
+      const response = await apiClient.post(API_ROUTES.ANALIZAR_IA_AVANZADA(reporteSeleccionado.id))
+      const result = response.data.analysis
+      
+      setAiAnalysisResult(result)
+      
+      setReportes(prev => prev.map(r => 
+        r.id === reporteSeleccionado.id 
+          ? { ...r, ai_metadata: { ...r.ai_metadata, detailed_analysis: result } }
+          : r
+      ))
+      
+      setReporteSeleccionado(prev => ({
+        ...prev,
+        ai_metadata: { ...prev.ai_metadata, detailed_analysis: result }
+      }))
+
+      toast.success('Análisis detallado completado')
+    } catch (err) {
+      console.error("AI Analysis Error:", err)
+      toast.error('Error al realizar el análisis detallado')
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   const handleGuardarCambios = async () => {
@@ -1486,25 +1543,31 @@ function DashboardMunicipal() {
     }
   }
 
-  // Simular notificaciones (en producción vendrían del backend)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (reportesCriticos.length > 0 && Math.random() > 0.7) {
-        const nuevoCritico = reportesCriticos[0]
-        const nuevaNotif = {
-          id: Date.now(),
-          tipo: 'critico',
-          titulo: 'Nuevo reporte crítico',
-          mensaje: `Reporte ${nuevoCritico.codigo_seguimiento || nuevoCritico.id} requiere atención inmediata`,
-          tiempo: 'Hace unos momentos'
-        }
-        setNotificaciones(prev => [nuevaNotif, ...prev].slice(0, 10))
-        toast.warning('Nuevo reporte crítico detectado')
+  // Cargar notificaciones reales (Fase 15)
+  const loadNotificaciones = async () => {
+    try {
+      const response = await apiClient.get(API_ROUTES.NOTIFICACIONES)
+      const nuevasNotificaciones = response.data.notificaciones || []
+      setNotificaciones(nuevasNotificaciones)
+      return true
+    } catch (error) {
+      if (error.response?.status !== 429) {
+        console.error('Error al cargar notificaciones en Dashboard:', error)
       }
-    }, 30000) // Cada 30 segundos
+      return false
+    }
+  }
 
-    return () => clearInterval(interval)
-  }, [reportesCriticos])
+  // Polling de notificaciones reales (Fase 15)
+  useEffect(() => {
+    loadNotificaciones()
+    const pollingCallback = loadNotificaciones
+    notificationPollingService.start(pollingCallback)
+    
+    return () => {
+      notificationPollingService.removeCallback(pollingCallback)
+    }
+  }, [])
 
   // Cargar estadísticas de inspectores
   useEffect(() => {
@@ -1890,6 +1953,8 @@ function DashboardMunicipal() {
               {mostrarNotificaciones && (
                 <NotificationsPanel
                   onClose={() => setMostrarNotificaciones(false)}
+                  initialNotificaciones={notificaciones}
+                  onRefresh={loadNotificaciones}
                 />
               )}
             </div>
@@ -2529,7 +2594,14 @@ function DashboardMunicipal() {
                               <div className="recent-report-id">{reporte.codigo_seguimiento || reporte.id}</div>
                               <div className="recent-report-info">
                                 <p className="recent-report-location">{reporte.direccion || reporte.direccion_completa || 'Sin dirección'}</p>
-                                <p className="recent-report-category">{reporte.categoria_nombre || 'Sin categoría'}</p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <p className="recent-report-category">{reporte.categoria_nombre || 'Sin categoría'}</p>
+                                  {reporte.ai_metadata?.product && (
+                                    <span className="recent-report-ai-badge">
+                                      <BrainIconSVG size={10} /> {reporte.ai_metadata.product}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <div className="recent-report-meta">
@@ -3093,6 +3165,7 @@ function DashboardMunicipal() {
                       <th>Fecha</th>
                       <th>Ubicación</th>
                       <th>Categoría</th>
+                      <th>IA / Producto</th>
                       <th>Riesgo</th>
                       <th>Estado</th>
                       <th>Acciones</th>
@@ -3126,6 +3199,16 @@ function DashboardMunicipal() {
                           <td>{new Date(reporte.fecha_creacion).toLocaleDateString()}</td>
                           <td>{reporte.direccion || reporte.direccion_completa || 'Sin dirección'}</td>
                           <td>{reporte.categoria_nombre || 'Sin categoría'}</td>
+                          <td>
+                            {reporte.ai_metadata?.product ? (
+                              <div className="ai-badge-table" title={`Confianza: ${(reporte.ai_metadata.confidence * 100).toFixed(0)}%`}>
+                                <BrainIconSVG size={12} className="ai-icon-pulse" />
+                                <span>{reporte.ai_metadata.product}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted" style={{ opacity: 0.4 }}>—</span>
+                            )}
+                          </td>
                           <td>
                             {reporte.prediction ? (
                               <span className={`risk-badge risk-${reporte.prediction.risk_level}`}>
@@ -3453,7 +3536,7 @@ function DashboardMunicipal() {
                       </span>
                     )}
                   </p>
-                  <div className="export-options">
+                  <div className="export-grid">
                     <div className="export-option">
                       <div className="export-icon">📄</div>
                       <h3>Exportar a CSV</h3>
@@ -3462,6 +3545,7 @@ function DashboardMunicipal() {
                         Descargar CSV
                       </button>
                     </div>
+                    
                     <div className="export-option">
                       <div className="export-icon">📊</div>
                       <h3>Exportar Estadísticas (PDF)</h3>
@@ -3470,6 +3554,7 @@ function DashboardMunicipal() {
                         Descargar PDF
                       </button>
                     </div>
+
                     <div className="export-option">
                       <div className="export-icon">📈</div>
                       <h3>Exportar Estadísticas (Excel)</h3>
@@ -3478,6 +3563,21 @@ function DashboardMunicipal() {
                         Descargar Excel
                       </button>
                     </div>
+
+                    {/* Nueva Opción: Datos de Inteligencia B2B */}
+                    <div className="export-option monetization-highlight">
+                      <div className="export-icon">💰</div>
+                      <h3>Inteligencia de Residuos (B2B)</h3>
+                      <p>Exporta metadatos de IA para empresas de reciclaje & valorización.</p>
+                      <div className="monetization-mini-stats">
+                        <span>Items: {estadisticas?.ia_insight?.total_analizados || 0}</span>
+                        <span>Est: \${(estadisticas?.ia_insight?.valor_estimado_reciclaje || 0).toFixed(0)}</span>
+                      </div>
+                      <button className="btn-export-ia" onClick={handleExportIA}>
+                        <BrainIconSVG size={14} /> Descargar Datos IA (CSV)
+                      </button>
+                    </div>
+
                     {localStorage.getItem('userType') === 'admin' && (
                       <div className="export-option" style={{ gridColumn: '1 / -1', background: '#f8fafc', border: '1px dashed #cbd5e1' }}>
                         <div className="export-icon">📩</div>
@@ -3549,7 +3649,29 @@ function DashboardMunicipal() {
             {/* Agregar visualización de imagen */}
             {reporteSeleccionado.foto ? (
               <div className="detail-group">
-                <label>Fotografía</label>
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  Fotografía
+                  <button 
+                    className="btn-ai-analyze"
+                    onClick={handleAnalizarIA}
+                    disabled={isAnalyzing}
+                    style={{
+                      fontSize: '11px',
+                      padding: '4px 8px',
+                      background: '#eff6ff',
+                      color: '#2563eb',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <BrainIconSVG size={14} />
+                    {isAnalyzing ? 'Analizando...' : 'Analizar con IA'}
+                  </button>
+                </label>
                 <div className="reporte-imagen-container">
                   {(() => {
                     let imagenUrl = reporteSeleccionado.foto;
@@ -3570,53 +3692,147 @@ function DashboardMunicipal() {
                       }
                     }
 
-                    console.log('URL de imagen construida:', imagenUrl);
-
                     return (
                       <div>
                         <img
                           src={imagenUrl}
                           alt={`Reporte ${reporteSeleccionado.codigo_seguimiento}`}
                           className="reporte-imagen"
+                          crossOrigin="anonymous"
                           onError={(e) => {
-                            console.error('Error al cargar imagen:', e.target.src);
-                            console.error('Reporte completo:', reporteSeleccionado);
                             e.target.style.display = 'none';
                             const errorMsg = document.getElementById(`error-${reporteSeleccionado.id}`);
-                            if (errorMsg) {
-                              errorMsg.style.display = 'block';
-                            }
-                          }}
-                          onLoad={() => {
-                            console.log('Imagen cargada exitosamente:', imagenUrl);
-                            const errorMsg = document.getElementById(`error-${reporteSeleccionado.id}`);
-                            if (errorMsg) {
-                              errorMsg.style.display = 'none';
-                            }
+                            if (errorMsg) errorMsg.style.display = 'block';
                           }}
                         />
-                        <p
-                          id={`error-${reporteSeleccionado.id}`}
-                          className="imagen-error"
-                          style={{
-                            display: 'none',
-                            color: '#d32f2f',
-                            fontSize: '14px',
-                            padding: '10px',
-                            textAlign: 'center',
-                            backgroundColor: '#ffebee',
-                            borderRadius: '4px',
-                            marginTop: '10px'
-                          }}
-                        >
-                          ⚠️ No se pudo cargar la imagen.<br />
-                          <small>URL: {imagenUrl}</small><br />
-                          <small>Verifica que el archivo exista en el servidor.</small>
+                        <p id={`error-${reporteSeleccionado.id}`} className="imagen-error" style={{ display: 'none' }}>
+                          ⚠️ No se pudo cargar la imagen.
                         </p>
                       </div>
                     );
                   })()}
                 </div>
+
+                {/* AI Result Area */}
+                {aiAnalysisResult && (
+                  <div className="ai-report-result" style={{
+                    marginTop: '12px',
+                    padding: '12px',
+                    background: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                    borderRadius: '8px',
+                    animation: 'fadeIn 0.3s ease'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <BrainIconSVG size={18} />
+                      <span style={{ fontWeight: 'bold', color: '#0369a1' }}>Inteligencia Artificial (Desglose)</span>
+                    </div>
+                    
+                    {aiAnalysisResult.items ? (
+                      <div className="ai-detailed-breakdown">
+                        <p style={{ fontSize: '12px', color: '#0c4a6e', marginBottom: '8px' }}>
+                          {aiAnalysisResult.summary || "Se detectaron los siguientes objetos en la imagen:"}
+                        </p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          {aiAnalysisResult.items.map((item, idx) => (
+                            <div key={idx} style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              padding: '6px 10px', 
+                              background: 'white', 
+                              borderRadius: '6px',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                              border: '1px solid #e0f2fe'
+                            }}>
+                              <span style={{ fontSize: '13px', color: '#1e293b' }}>{item.label}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontWeight: 'bold', color: '#2563eb' }}>{item.count}</span>
+                                {item.unit && <span style={{ fontSize: '10px', color: '#64748b' }}>{item.unit}</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        {aiAnalysisResult.engineering_metadata && (
+                          <div style={{ 
+                            marginTop: '15px', 
+                            padding: '12px', 
+                            background: '#f8fafc', 
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: '10px'
+                          }}>
+                            <div style={{ textAlign: 'center' }}>
+                              <span style={{ display: 'block', fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Reciclabilidad</span>
+                              <strong style={{ fontSize: '12px', color: '#0f172a' }}>{aiAnalysisResult.engineering_metadata.recyclability_index}</strong>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <span style={{ display: 'block', fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Peso Est. (Ton)</span>
+                              <strong style={{ fontSize: '12px', color: '#0f172a' }}>{aiAnalysisResult.engineering_metadata.estimated_weight_ton}</strong>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <span style={{ display: 'block', fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Poder Calorífico</span>
+                              <strong style={{ fontSize: '12px', color: '#0f172a' }}>{aiAnalysisResult.engineering_metadata.thermal_value_est}</strong>
+                            </div>
+                          </div>
+                        )}
+
+                        {aiAnalysisResult.material_summary && (
+                          <div style={{ 
+                            marginTop: '12px', 
+                            padding: '10px', 
+                            background: '#eff6ff', 
+                            borderRadius: '6px',
+                            borderLeft: '4px solid #3b82f6',
+                            fontSize: '12px',
+                            color: '#1e40af'
+                          }}>
+                            <strong>Resumen Técnico:</strong> {aiAnalysisResult.material_summary}
+                          </div>
+                        )}
+
+                        <div style={{ 
+                          marginTop: '12px', 
+                          paddingTop: '8px', 
+                          borderTop: '1px dashed #bae6fd',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}>
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#0c4a6e' }}>Total de objetos:</span>
+                          <span style={{ 
+                            background: '#2563eb', 
+                            color: 'white', 
+                            padding: '2px 8px', 
+                            borderRadius: '12px',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                          }}>
+                            {aiAnalysisResult.total_count}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                        <div className="ai-stat">
+                          <span style={{ fontSize: '12px', color: '#64748b', display: 'block' }}>Categoría Sugerida</span>
+                          <span style={{ fontWeight: 'bold', color: '#0c4a6e' }}>{aiAnalysisResult.categoryName}</span>
+                        </div>
+                        <div className="ai-stat">
+                          <span style={{ fontSize: '12px', color: '#64748b', display: 'block' }}>Producto Detectado</span>
+                          <span style={{ fontWeight: 'bold', color: '#0c4a6e' }}>{aiAnalysisResult.detectedProduct || 'Genérico'}</span>
+                        </div>
+                        <div className="ai-stat">
+                          <span style={{ fontSize: '12px', color: '#64748b', display: 'block' }}>Confianza</span>
+                          <span style={{ fontWeight: 'bold', color: '#0c4a6e' }}>{Math.round((aiAnalysisResult.score || 0.95) * 100)}%</span>
+                        </div>
+                      </div>
+                    )}
+                 
+                  </div>
+                )}
               </div>
             ) : (
               <div className="detail-group">

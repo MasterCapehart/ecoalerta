@@ -97,7 +97,8 @@ class ReporteSerializer(serializers.ModelSerializer):
             'descripcion', 'email', 'foto', 'imagenes', 'lat', 'lng', 'direccion',
             'estado', 'notas_internas', 'fecha_creacion', 'fecha_actualizacion',
             'asignado_a', 'prediction', 'prioridad', 'prioridad_calculada',
-            'tags', 'score_confianza', 'es_spam', 'validado', 'direccion_completa'
+            'tags', 'score_confianza', 'es_spam', 'validado', 'direccion_completa',
+            'ai_metadata'
         ]
         read_only_fields = ['codigo_seguimiento', 'fecha_creacion', 'fecha_actualizacion']
     
@@ -319,7 +320,8 @@ class ReporteDetalleSerializer(serializers.ModelSerializer):
             'estado', 'notas_internas', 'fecha_creacion', 'fecha_actualizacion',
             'creado_por_nombre', 'asignado_a', 'prediction', 'prioridad',
             'prioridad_calculada', 'tags', 'score_confianza', 'es_spam',
-            'validado', 'direccion_completa', 'tiempo_resolucion_horas', 'cierre'
+            'validado', 'direccion_completa', 'tiempo_resolucion_horas', 'cierre',
+            'ai_metadata'
         ]
     
     def to_representation(self, instance):

@@ -23,6 +23,12 @@ Antes de instalar las dependencias, debes configurar las variables de entorno pa
 
 ### 🪟 Windows
 
+> **⚠️ ADVERTENCIA CRÍTICA PARA WINDOWS (GIS):** EcoAlerta usa librerías geoespaciales (GeoDjango) que son muy complejas de instalar nativamente en este sistema operativo (`mod_spatialite.dll` o PostGIS nativo).
+> **Solución altamente recomendada:** Si usas Windows, **ignora los pasos del backend a continuación** y simplemente ejecuta `docker-compose up -d` en la raíz del proyecto (requiere *Docker Desktop* instalado). Esto levantará una base de datos Linux, el backend y todos los servicios espaciales sin errores. Luego, actívate solo en el frontend con `npm run dev`.
+
+---
+
+
 **1. Preparar ejecución de scripts (Solo una vez en PowerShell, requiere administrador)**
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser

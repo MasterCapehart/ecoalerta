@@ -148,6 +148,9 @@ class Reporte(models.Model):
     # Colaboración Ciudadana
     validaciones_ciudadanas = models.IntegerField(default=0) # Cantidad de "Lo veo también"
     
+    # IA y Metadatos (Fase 12-C)
+    ai_metadata = models.JSONField(null=True, blank=True) # {'category': str, 'product': str, 'confidence': float}
+    
     # Auditoría
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)

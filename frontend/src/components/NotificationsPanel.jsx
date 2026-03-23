@@ -5,10 +5,10 @@ import { toast } from './ToastContainer'
 import notificationPollingService from '../services/notificationPolling'
 import './NotificationsPanel.css'
 
-function NotificationsPanel({ onClose }) {
-  const [notificaciones, setNotificaciones] = useState([])
-  const [noLeidas, setNoLeidas] = useState(0)
-  const [loading, setLoading] = useState(true)
+function NotificationsPanel({ onClose, initialNotificaciones = [], onRefresh }) {
+  const [notificaciones, setNotificaciones] = useState(initialNotificaciones)
+  const [noLeidas, setNoLeidas] = useState(initialNotificaciones.filter(n => !n.leido).length)
+  const [loading, setLoading] = useState(initialNotificaciones.length === 0)
   const pollingCallbackRef = useRef(null)
 
   const loadNotificaciones = async () => {
@@ -66,6 +66,7 @@ function NotificationsPanel({ onClose }) {
         n.id === id ? { ...n, leido: true } : n
       ))
       setNoLeidas(prev => Math.max(0, prev - 1))
+      if (onRefresh) onRefresh() // Sincronizar con el badge del Dashboard
     } catch (error) {
       console.error('Error al marcar como leída:', error)
       toast.error('Error al actualizar notificación')
@@ -82,6 +83,7 @@ function NotificationsPanel({ onClose }) {
       )
       setNotificaciones(prev => prev.map(n => ({ ...n, leido: true })))
       setNoLeidas(0)
+      if (onRefresh) onRefresh() // Sincronizar con el badge del Dashboard
       toast.success('Todas las notificaciones marcadas como leídas')
     } catch (error) {
       console.error('Error al marcar todas como leídas:', error)

@@ -781,10 +781,12 @@
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Permitir que el modal empiece desde arriba */
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 0.3s ease;
+  overflow-y: auto; /* Scroll en el overlay */
+  padding: 2rem 0; /* Espacio para que no pegue a los bordes */
 }
 
 @keyframes fadeIn {
@@ -802,11 +804,11 @@
   padding: 2.5rem;
   max-width: 700px;
   width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
+  margin: auto; /* Centrado horizontal y vertical si cabe */
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid rgba(0, 0, 0, 0.05);
+  position: relative;
 }
 
 @keyframes slideUp {
@@ -4655,4 +4657,136 @@
   border-radius: 999px;
   margin-right: 12px;
   white-space: nowrap;
+}
+
+/* AI & Products Badges (Phase 12-C) */
+.ai-badge-table {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  color: #1565c0;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid rgba(21, 101, 192, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.ai-badge-table:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #bbdefb 0%, #90caf9 100%);
+}
+
+.recent-report-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(34, 139, 34, 0.1);
+  color: #228B22;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ai-icon-pulse {
+  color: #1976d2;
+  animation: aiPulse 2s infinite;
+}
+
+@keyframes aiPulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.8; }
+}
+
+/* Monetization & B2B Styles (Phase 14) */
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.monetization-highlight {
+  background: linear-gradient(135deg, #fff9c4 0%, #fff176 100%) !important;
+  border: 2px solid #fbc02d !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.monetization-highlight::after {
+  content: 'B2B PREMIUM';
+  position: absolute;
+  top: 12px;
+  right: -30px;
+  background: #fbc02d;
+  color: #333;
+  padding: 4px 35px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  transform: rotate(45deg);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.monetization-mini-stats {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #5f5000;
+}
+
+.btn-export-ia {
+  width: 100%;
+  padding: 0.875rem;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.2);
+}
+
+.btn-export-ia:hover {
+  background: #1565c0;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(25, 118, 210, 0.3);
+}
+
+.text-success {
+  color: #2e7d32 !important;
+}
+
+/* Soporte para Pantallas Pequeñas (Mobile) */
+@media (max-width: 768px) {
+  .modal-content {
+    padding: 1.5rem;
+    width: 95%;
+    margin: 1rem auto;
+  }
+
+  .ai-detailed-breakdown div {
+    grid-template-columns: 1fr !important; /* Stack items on mobile */
+  }
+
+  .modal-overlay {
+    padding: 1rem 0;
+  }
 }

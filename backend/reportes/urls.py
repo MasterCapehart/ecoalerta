@@ -19,6 +19,8 @@ from .views import (
     estadisticas_avanzadas,
     exportar_pdf,
     exportar_excel,
+    exportar_ia_csv,
+    analizar_ia_avanzada,
     comentarios_publicos,
     seguimiento_publico,
     actualizar_prioridades,
@@ -59,6 +61,8 @@ urlpatterns = [
     path('analytics/avanzadas/', estadisticas_avanzadas, name='estadisticas-avanzadas'),
     path('analytics/exportar-pdf/', exportar_pdf, name='exportar-pdf'),
     path('analytics/exportar-excel/', exportar_excel, name='exportar-excel'),
+    path('analytics/exportar-datos-ia/', exportar_ia_csv, name='exportar-ia-csv'),
+    path('reportes/<int:reporte_id>/analizar-ia-avanzada/', analizar_ia_avanzada, name='analizar_ia_avanzada'),
     path('analytics/gerencial/', generar_reporte_gerencial, name='generar-reporte-gerencial'),
     path('analytics/predicciones-espaciales/', predicciones_espaciales, name='predicciones-espaciales'),
 

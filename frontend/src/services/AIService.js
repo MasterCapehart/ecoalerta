@@ -29,9 +29,27 @@ const CATEGORY_MAPPINGS = [
         confidence: 0
     },
     {
-        keywords: ['battery', 'chemical', 'paint', 'oil', 'gas'],
+        keywords: ['battery', 'chemical', 'paint', 'oil', 'gas', 'toxic'],
         categoryId: 5, // ID estimado para Peligrosos
         categoryName: 'Residuos Peligrosos',
+        confidence: 0
+    },
+    {
+        keywords: ['food', 'fruit', 'vegetable', 'meat', 'bread', 'organic', 'banana', 'apple', 'leftovers'],
+        categoryId: 6, // Nuevo ID para Orgánicos
+        categoryName: 'Residuos Orgánicos / Comida',
+        confidence: 0
+    },
+    {
+        keywords: ['brick', 'concrete', 'stone', 'wood', 'construction', 'rubble', 'tile', 'cement'],
+        categoryId: 2, // Se puede mapear a Escombros (ID 2 en el form suele ser reciclable/escombro)
+        categoryName: 'Escombros / Construcción',
+        confidence: 0
+    },
+    {
+        keywords: ['clothes', 'fabric', 'textile', 'shoe', 'shirt', 'pants', 'towel'],
+        categoryId: 3, // Se puede mapear a Voluminosos/Otros
+        categoryName: 'Ropa y Textiles',
         confidence: 0
     }
 ]
@@ -97,10 +115,11 @@ class AIService {
                 }
             }
 
-            if (bestMatch && maxScore > 0.1) { // Umbral bajo porque MobileNet es genérico
+            if (bestMatch && maxScore > 0.05) { // Bajamos un poco el umbral para captar más detalles
                 return {
                     ...bestMatch,
                     originalPrediction: predictions[0].className,
+                    detectedProduct: predictions[0].className.split(',')[0], // Tomar el primer término
                     score: maxScore
                 }
             }

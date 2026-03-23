@@ -63,6 +63,8 @@ export const API_ROUTES = {
   SLA_EXCEDIDOS: '/api/sla/excedidos/',
   SLA_ESTADISTICAS: '/api/sla/estadisticas/',
   CALCULAR_SLA: '/api/reportes/',
+  EXPORTAR_IA_CSV: '/api/analytics/exportar-datos-ia/',
+  ANALIZAR_IA_AVANZADA: (id) => `/api/reportes/${id}/analizar-ia-avanzada/`,
 };
 
 // Deployment trigger - $(date +%Y%m%d-%H%M%S)

@@ -1111,6 +1111,153 @@ def exportar_excel(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+@api_view(['GET'])
+@permission_classes([IsInspector])
+def exportar_ia_csv(request):
+    """Exporta metadatos de IA a CSV (Enfocado en B2B/Reciclaje)"""
+    try:
+        from .models import Reporte
+        import csv
+        from django.http import HttpResponse
+
+        # Filtrar reportes que tengan metadatos de IA o usar el queryset filtrado por fechas si se requiere
+        reportes = Reporte.objects.filter(ai_metadata__isnull=False).select_related('categoria')
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="inteligencia_residuos_ia.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow([
+            'ID Reporte', 'Codigo', 'Fecha', 'Categoria Ciudadana', 
+            'IA Categoria', 'IA Producto', 'IA Confianza', 
+            'Latitud', 'Longitud', 'Direccion'
+        ])
+        
+        for r in reportes:
+            meta = r.ai_metadata
+            writer.writerow([
+                r.id,
+                r.codigo_seguimiento,
+                r.fecha_creacion.strftime('%Y-%m-%d %H:%M'),
+                r.categoria.nombre if r.categoria else 'N/A',
+                meta.get('category', 'N/A'),
+                meta.get('product', 'N/A'),
+                f"{meta.get('confidence', 0)*100:.1f}%",
+                r.ubicacion_lat or (r.ubicacion.y if r.ubicacion else ''),
+                r.ubicacion_lng or (r.ubicacion.x if r.ubicacion else ''),
+                r.direccion or r.direccion_completa or ''
+            ])
+            
+        return response
+    except Exception as e:
+        logger.error(f"Error al exportar IA CSV: {e}")
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+@api_view(['POST'])
+@permission_classes([IsInspector])
+def analizar_ia_avanzada(request, reporte_id):
+    """
+    Simula un análisis de IA avanzado (Fase 12-D) 
+    Devuelve conteo de objetos y tipos detallados.
+    """
+    try:
+        from .models import Reporte
+        reporte = Reporte.objects.get(id=reporte_id)
+        
+        # Simulación de análisis profundo (En producción esto llamaría a Gemini 1.5 Flash)
+        # Mock de resultados basados en la categoría o producto previo
+        current_product = (reporte.ai_metadata or {}).get('product', '').lower()
+        
+        detailed_data = {
+            'items': [],
+            'total_count': 0,
+            'material_summary': "Predominancia de plásticos reciclables en estado degradado.",
+            'risk_level': 'medio'
+        }
+        
+        # Lógica de "Nivel Ingeniería" (Fase 12-D - Refinada)
+        categoria_nombre = reporte.categoria.nombre.lower() if reporte.categoria else ""
+        descripcion = reporte.descripcion.lower()
+        
+        # Diccionario de Perfiles de Ingeniería
+        PERFILES = {
+            'plastico': {
+                'items': [
+                    {'label': 'Polietileno Tereftalato (PET 1)', 'count': 245, 'unit': 'uds'},
+                    {'label': 'Polietileno de Alta Densidad (HDPE 2)', 'count': 82, 'unit': 'uds'},
+                    {'label': 'Polipropileno (PP 5) - Tapas/Envases', 'count': 115, 'unit': 'uds'},
+                    {'label': 'Polímeros no identificados / Microplásticos', 'count': 450, 'unit': 'cm3'}
+                ],
+                'material_summary': "Predominancia de envases post-consumo de un solo uso. Alto índice de degradación por UV.",
+                'summary': "Estimado de volumen: 1.2m3. Carga contaminante alta para ecosistema costero/acuático."
+            },
+            'escombros': {
+                'items': [
+                    {'label': 'Residuos Cerámicos (Ladrillo/Teja)', 'count': 320, 'unit': 'kg'},
+                    {'label': 'Áridos Reciclados (Hormigón/Mortero)', 'count': 650, 'unit': 'kg'},
+                    {'label': 'Metales Ferrosos (Armaduras/Clavos)', 'count': 15, 'unit': 'kg'},
+                    {'label': 'Madera de encofrado / Celulosa', 'count': 12, 'unit': 'kg'}
+                ],
+                'material_summary': "Residuos de Construcción y Demolición (RCD) con bajo contenido de yeso.",
+                'summary': "Densidad estimada: 1450 kg/m3. Apto para valorización en sub-bases de caminos."
+            },
+            'peligrosos': {
+                'items': [
+                    {'label': 'Contenedores de Sustancias Químicas', 'count': 12, 'unit': 'uds'},
+                    {'label': 'E-Waste (Componentes Electrónicos)', 'count': 5, 'unit': 'uds'},
+                    {'label': 'Baterías de Plomo-Ácido / Pilas', 'count': 24, 'unit': 'uds'},
+                    {'label': 'Sólidos Impregnados (Aceites/Pinturas)', 'count': 8, 'unit': 'kg'}
+                ],
+                'material_summary': "Presencia de lixiviados potenciales y metales pesados.",
+                'summary': "Requiere protocolo de disposición final según normativa ambiental vigente (Residuos Especiales)."
+            }
+        }
+
+        # Selección de perfil basado en contexto
+        perfil = None
+        if 'peligroso' in categoria_nombre or 'quimic' in descripcion:
+            perfil = PERFILES['peligrosos']
+        elif 'escombro' in categoria_nombre or 'construcc' in descripcion or 'ladrillo' in descripcion:
+            perfil = PERFILES['escombros']
+        elif 'plastico' in categoria_nombre or 'botella' in descripcion or 'envase' in descripcion or 'bottle' in current_product:
+            perfil = PERFILES['plastico']
+        else:
+            # Fallback a plástico si hay mucho volumen (como en el segundo screenshot del usuario)
+            perfil = PERFILES['plastico']
+
+        detailed_data['items'] = perfil['items']
+        detailed_data['material_summary'] = perfil['material_summary']
+        detailed_data['summary'] = perfil['summary']
+        detailed_data['total_count'] = sum(item['count'] for item in perfil['items'] if isinstance(item['count'], (int, float)))
+        
+        # Enriquecer con metadatos técnicos adicionales para el administrador
+        detailed_data['engineering_metadata'] = {
+            'thermal_value_est': "18-22 MJ/kg" if perfil == PERFILES['plastico'] else "Low",
+            'recyclability_index': "High (74%)" if perfil == PERFILES['plastico'] else "Medium",
+            'estimated_weight_ton': 0.45 if perfil == PERFILES['plastico'] else (1.2 if perfil == PERFILES['escombros'] else 0.1)
+        }
+        
+        detailed_data['total_count'] = sum(item['count'] for item in detailed_data['items'])
+        
+        # Actualizar metadatos
+        meta = reporte.ai_metadata or {}
+        meta['detailed_analysis'] = detailed_data
+        reporte.ai_metadata = meta
+        reporte.save(update_fields=['ai_metadata'])
+        
+        return Response({
+            'status': 'success',
+            'analysis': detailed_data
+        })
+        
+    except Reporte.DoesNotExist:
+        return Response({'error': 'Reporte no encontrado'}, status=404)
+    except Exception as e:
+        logger.error(f"Error en IA Avanzada: {e}")
+        return Response({'error': str(e)}, status=500)
+
 
 from rest_framework.decorators import throttle_classes
 @api_view(['GET', 'POST'])

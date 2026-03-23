@@ -107,7 +107,8 @@ const ReporteForm = () => {
           { id: 1, nombre: 'Residuos Domésticos' },
           { id: 2, nombre: 'Escombros' },
           { id: 3, nombre: 'Voluminosos' },
-          { id: 4, nombre: 'Peligrosos' }
+          { id: 4, nombre: 'Peligrosos' },
+          { id: 6, nombre: 'Residuos Orgánicos' }
         ])
       }
     }
@@ -247,6 +248,15 @@ const ReporteForm = () => {
       if (data.descripcion) formData.append('descripcion', data.descripcion)
       if (data.email) formData.append('email', data.email)
       if (data.direccion) formData.append('direccion', data.direccion)
+
+      // Enviar metadatos de IA si existen (Fase 12-C)
+      if (aiSuggestion) {
+        formData.append('ai_metadata', JSON.stringify({
+          category: aiSuggestion.categoryName,
+          product: aiSuggestion.detectedProduct,
+          confidence: aiSuggestion.score
+        }))
+      }
 
       if (data.fotos.length > 0) {
         formData.append('foto', data.fotos[0])
@@ -482,14 +492,22 @@ const ReporteForm = () => {
                   animation: 'fadeIn 0.5s ease-in'
                 }}
               >
-                <div style={{ fontSize: '24px' }}>🤖</div>
-                <div>
-                  <div style={{ fontWeight: 'bold', color: '#1565c0', fontSize: '14px' }}>
+                <div style={{ fontSize: '28px', filter: 'drop-shadow(0 0 5px rgba(33, 150, 243, 0.3))' }}>🤖</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 'bold', color: '#1565c0', fontSize: '14px', marginBottom: '2px' }}>
                     IA Detectó: {aiSuggestion.categoryName}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#546e7a' }}>
-                    Pulsa aquí para clasificar automáticamente
+                  {aiSuggestion.detectedProduct && (
+                    <div style={{ fontSize: '12px', color: '#0277bd', fontStyle: 'italic', marginBottom: '4px' }}>
+                      Producto específico: <strong>{aiSuggestion.detectedProduct}</strong>
+                    </div>
+                  )}
+                  <div style={{ fontSize: '11px', color: '#546e7a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Check size={12} /> Pulsa aquí para clasificar automáticamente
                   </div>
+                </div>
+                <div style={{ background: '#2196f3', color: 'white', fontSize: '10px', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold' }}>
+                  {Math.round(aiSuggestion.score * 100)}%
                 </div>
               </div>
             )}

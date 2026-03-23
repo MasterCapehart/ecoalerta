@@ -69,6 +69,7 @@ class ReportsService:
             'tiempo_promedio_resolucion': ReportsService._get_average_resolution_time(queryset),
             'tasa_resolucion': ReportsService._get_resolution_rate(queryset),
             'top_inspectores': ReportsService._get_top_inspectores(queryset),
+            'ia_insight': ReportsService._get_ai_insights(queryset),
         }
         
         return stats
@@ -118,6 +119,38 @@ class ReportsService:
             )
             .order_by('-total_resueltos')[:10]
         )
+    
+    @staticmethod
+    def _get_ai_insights(queryset):
+        """Genera insights basados en metadatos de IA"""
+        reportes_con_ia = queryset.filter(ai_metadata__isnull=False)
+        total_analizados = reportes_con_ia.count()
+        
+        if total_analizados == 0:
+            return None
+            
+        # Conteo de productos específicos desde el JSONB
+        # Nota: En Django 3.0+ podemos usar KeyTransform o simplemente iterar si el volumen no es masivo
+        # Para este dashboard, procesaremos los más frecuentes
+        productos = {}
+        for r in reportes_con_ia:
+            meta = r.ai_metadata
+            if isinstance(meta, dict) and 'product' in meta:
+                prod = meta['product']
+                productos[prod] = productos.get(prod, 0) + 1
+        
+        # Ordenar y tomar los top 10
+        top_productos = sorted(
+            [{'producto': k, 'cantidad': v} for k, v in productos.items()],
+            key=lambda x: x['cantidad'],
+            reverse=True
+        )[:10]
+        
+        return {
+            'total_analizados': total_analizados,
+            'top_productos': top_productos,
+            'valor_estimado_reciclaje': sum(p['cantidad'] for p in top_productos) * 0.5 # Valor pedagógico
+        }
     
     @staticmethod
     def export_to_pdf(stats, output_stream):
@@ -191,6 +224,24 @@ class ReportsService:
         tasa_text = f"Tasa de resolución: {stats['tasa_resolucion']:.2f}%"
         elements.append(Paragraph(tasa_text, styles['Normal']))
         
+        # Nueva sección de IA
+        if stats.get('ia_insight'):
+            elements.append(Spacer(1, 0.3*inch))
+            elements.append(Paragraph("Inteligencia de Residuos (IA)", styles['Heading2']))
+            elements.append(Paragraph(f"Total de reportes analizados por IA: {stats['ia_insight']['total_analizados']}", styles['Normal']))
+            
+            ia_data = [['Producto Detectado', 'Cantidad']]
+            for item in stats['ia_insight']['top_productos']:
+                ia_data.append([item['producto'], str(item['cantidad'])])
+            
+            ia_table = Table(ia_data)
+            ia_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.cadetblue),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            elements.append(ia_table)
+        
         doc.build(elements)
         return output_stream
     
@@ -258,6 +309,31 @@ class ReportsService:
                 ws2[f'B{row}'] = item['total']
                 row += 1
         
+        # Hoja de IA
+        if stats.get('ia_insight'):
+            ws3 = wb.create_sheet("Inteligencia IA")
+            ws3['A1'] = "Análisis de Productos Detectados"
+            ws3['A2'] = f"Total Analizados: {stats['ia_insight']['total_analizados']}"
+            
+            ws3['A4'] = "Producto"
+            ws3['B4'] = "Frecuencia"
+            
+            row = 5
+            for item in stats['ia_insight']['top_productos']:
+                ws3[f'A{row}'] = item['producto']
+                ws3[f'B{row}'] = item['cantidad']
+                row += 1
+            
+            # Gráfico de IA
+            chart_ia = BarChart()
+            chart_ia.title = "Composición de Residuos (IA)"
+            chart_ia.y_axis.title = "Frecuencia"
+            data_ia = Reference(ws3, min_col=2, min_row=4, max_row=row-1)
+            cats_ia = Reference(ws3, min_col=1, min_row=5, max_row=row-1)
+            chart_ia.add_data(data_ia, titles_from_data=False)
+            chart_ia.set_categories(cats_ia)
+            ws3.add_chart(chart_ia, "D4")
+
         wb.save(output_stream)
         return output_stream
 
