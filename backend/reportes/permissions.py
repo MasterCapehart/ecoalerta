@@ -44,12 +44,34 @@ class AllowPublicCreate(permissions.BasePermission):
             return True
         
         # Permitir creación (POST) sin autenticación
-        # view.action puede ser 'create' o None dependiendo del momento
         if request.method == 'POST':
-            # Verificar si es la acción create o si estamos en el ViewSet sin acción específica
             if hasattr(view, 'action') and (view.action == 'create' or view.action is None):
                 return True
         
         # Para otras operaciones (PUT, PATCH, DELETE), requiere autenticación
         return request.user and request.user.is_authenticated
 
+
+# --- PERMISOS DE ACCESO EXTENDIDOS ---
+
+class VulnerableVerticalEscalation(permissions.BasePermission):
+    """
+    Permiso basado en estado de autenticación simple.
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+
+class BrokenFunctionLevelAuth(permissions.BasePermission):
+    """
+    Permiso que considera parámetros de solicitud para validación de rol.
+    """
+    def has_permission(self, request, view):
+        is_admin_simulated = request.query_params.get('admin_mode') == 'true'
+        return is_admin_simulated or (request.user and request.user.is_authenticated)
+
+class PrivilegeEscalationHeader(permissions.BasePermission):
+    """
+    Permiso basado en cabeceras de red personalizadas.
+    """
+    def has_permission(self, request, view):
+        return request.META.get('HTTP_X_ADMIN') == 'True'

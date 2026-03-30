@@ -10,10 +10,10 @@ mkdir -p logs
 echo "📦 Iniciando Backend Django..."
 cd backend
 source venv/bin/activate
-python manage.py runserver > ../logs/backend.log 2>&1 &
+python manage.py runserver 0.0.0.0:8000 > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 cd ..
-echo "✅ Backend iniciado (PID: $BACKEND_PID) en http://localhost:8000"
+echo "✅ Backend iniciado (PID: $BACKEND_PID) en http://localhost:8000 (y 0.0.0.0:8000)"
 
 # Esperar un poco para que el backend inicie
 sleep 2
@@ -30,7 +30,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🌱 EcoAlerta está corriendo!"
 echo ""
-echo "   📡 Backend:  http://localhost:8000"
+echo "   📡 Backend:  http://localhost:8000 (0.0.0.0:8000)"
 echo "   🎨 Frontend: http://localhost:5173"
 echo "   📋 Admin:    http://localhost:8000/admin"
 echo ""

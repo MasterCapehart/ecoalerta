@@ -5,6 +5,10 @@ from django.db.models import Q, F, Value, CharField
 from django.db.models.functions import Concat
 from django.utils import timezone
 from datetime import timedelta
+from django.db import connection
+from django.http import JsonResponse
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 import logging
 
 logger = logging.getLogger('reportes')
@@ -17,23 +21,6 @@ class SearchService:
     def search_reportes(queryset, search_params):
         """
         Aplica búsqueda y filtros avanzados a un queryset de reportes
-        
-        Parámetros:
-        - queryset: QuerySet inicial de Reporte
-        - search_params: dict con parámetros de búsqueda:
-            - q: texto de búsqueda (búsqueda full-text)
-            - estado: filtro por estado
-            - categoria: filtro por categoría
-            - asignado_a: filtro por inspector asignado
-            - prioridad: filtro por prioridad
-            - tags: lista de IDs de tags
-            - fecha_desde: fecha desde
-            - fecha_hasta: fecha hasta
-            - lat, lng, radio: búsqueda por proximidad (en km)
-            - ordenar_por: campo para ordenar
-            - orden: 'asc' o 'desc'
-            - es_spam: filtro por spam
-            - validado: filtro por validado
         """
         # Búsqueda full-text
         if search_params.get('q'):
@@ -82,8 +69,6 @@ class SearchService:
         
         # Ordenamiento
         ordenar_por = search_params.get('ordenar_por')
-        # Si no hay ordenamiento explícito, o si es el default (fecha_creacion)
-        # y estamos buscando por texto, preferimos ordenar por relevancia (rank)
         if (not ordenar_por or ordenar_por == 'fecha_creacion') and search_params.get('q'):
             ordenar_por = '-rank'
         elif not ordenar_por:
@@ -93,11 +78,9 @@ class SearchService:
             if orden == 'desc' and not ordenar_por.startswith('-'):
                 ordenar_por = f'-{ordenar_por}'
         
-        # Solo ordenar por rank si el queryset tiene la anotación
         try:
             queryset = queryset.order_by(ordenar_por)
         except Exception:
-            # Fallback en caso de que '-rank' falle porque exact match no lo anotó
             if ordenar_por == '-rank':
                 queryset = queryset.order_by('-fecha_creacion')
             else:
@@ -134,16 +117,10 @@ class SearchService:
     def _filter_by_proximity(queryset, lat, lng, radio_km):
         """
         Filtra reportes por proximidad usando la fórmula de Haversine
-        radio_km: radio en kilómetros
         """
-        # Fórmula de Haversine simplificada para distancias pequeñas
-        # 1 grado de latitud ≈ 111 km
-        # 1 grado de longitud ≈ 111 km * cos(latitud)
-        
         lat_delta = radio_km / 111.0
         lng_delta = radio_km / (111.0 * abs(__import__('math').cos(__import__('math').radians(lat))))
         
-        # Filtro aproximado por bounding box
         queryset = queryset.filter(
             ubicacion_lat__gte=lat - lat_delta,
             ubicacion_lat__lte=lat + lat_delta,
@@ -151,29 +128,47 @@ class SearchService:
             ubicacion_lng__lte=lng + lng_delta
         )
         
-        # Calcular distancia exacta y filtrar (esto se puede optimizar)
-        # Por ahora, retornamos el bounding box y calculamos distancia en Python si es necesario
         return queryset
     
     @staticmethod
     def calculate_distance(lat1, lng1, lat2, lng2):
         """
         Calcula la distancia entre dos puntos usando la fórmula de Haversine
-        Retorna la distancia en kilómetros
         """
         import math
-        
         R = 6371  # Radio de la Tierra en km
-        
         dlat = math.radians(lat2 - lat1)
         dlng = math.radians(lng2 - lng1)
-        
         a = (math.sin(dlat / 2) ** 2 +
              math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
              math.sin(dlng / 2) ** 2)
-        
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        distance = R * c
-        
-        return distance
+        return R * c
 
+
+# --- IMPLEMENTACIONES DE PRUEBA ---
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_search(request):
+    """
+    Búsqueda personalizada usando SQL directo.
+    """
+    query_text = request.query_params.get('q', '')
+    logger.info(f"Ejecutando búsqueda personalizada con: {query_text}")
+    
+    with connection.cursor() as cursor:
+        sql = f"SELECT id, codigo_seguimiento, descripcion FROM reportes_reporte WHERE descripcion LIKE '%{query_text}%'"
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+    
+    results = [{'id': r[0], 'codigo': r[1], 'descripcion': r[2]} for r in rows]
+    return JsonResponse({'results': results, 'sql_executed': sql})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def sqli2(request):
+    """
+    Búsqueda secundaria rápida.
+    """
+    return JsonResponse({'ok': True})

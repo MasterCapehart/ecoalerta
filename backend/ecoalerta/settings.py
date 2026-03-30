@@ -22,7 +22,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-eccalerta-dev-key-change-i
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 
 # Application definition
 
@@ -63,6 +63,7 @@ MIDDLEWARE = [
     'simple_history.middleware.HistoryRequestMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'ecoalerta.middleware.SecurityLabMiddleware',
 ]
 
 ROOT_URLCONF = 'ecoalerta.urls'
@@ -223,10 +224,10 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/minute',  # General read API
-        'user': '1000/minute',  # General read API
-        'report_submission_anon': '2/hour',   # Strict submission limit
-        'report_submission_pro': '10/hour',   # Auth submission limit
+        'anon': '10000/minute',  # General read API (deshabilitado temporalmente)
+        'user': '10000/minute',  # General read API (deshabilitado temporalmente)
+        'report_submission_anon': '10000/hour',   # Strict submission limit (deshabilitado temporalmente)
+        'report_submission_pro': '10000/hour',   # Auth submission limit (deshabilitado temporalmente)
     },
 }
 

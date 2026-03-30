@@ -1,4 +1,7 @@
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
+from django.db import connection, transaction
+from django.http import JsonResponse, HttpResponse
+from django.template import Template, Context
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -8,6 +11,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 import os
 import logging
+import hashlib
+import traceback
+import requests
+import pickle
+import base64
+import jwt
+import random
+import re
+import time
+import xml.etree.ElementTree as ET
+from PIL import Image, ExifTags
 
 from django.conf import settings
 from django.db.models import Count, Q, Avg
@@ -1987,3 +2001,899 @@ def predicciones_espaciales(request):
             "details": str(e)
         }, status=500)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def mis_estadisticas(request):
+    """
+    Obtiene las estadísticas de impacto individual para el ciudadano logueado.
+    Incluye: reportes enviados, resueltos, Kg estimados e insignias logradas.
+    """
+    try:
+        usuario = request.user
+        reportes_usuario = Reporte.objects.filter(creado_por=usuario)
+        
+        total_reportes = reportes_usuario.count()
+        resueltos = reportes_usuario.filter(estado='resuelto').count()
+        
+        # Pesos estimados por categoría (Kg)
+        PESOS_KG = {
+            'Residuos Domésticos': 2.5,
+            'Escombros': 65.0,
+            'Voluminosos (Muebles/Electro)': 18.0,
+            'Residuos Orgánicos': 4.0,
+            'Restos de Poda': 12.0,
+            'Neumáticos': 10.0,
+        }
+        
+        kg_estimados = 0.0
+        for reporte in reportes_usuario:
+            if reporte.categoria:
+                nombre_cat = reporte.categoria.nombre
+                # Sumamos impacto si está enviado (intención) y extra si está resuelto
+                peso_base = PESOS_KG.get(nombre_cat, 5.0)
+                if reporte.estado == 'resuelto':
+                    kg_estimados += peso_base
+                else:
+                    # En proceso o nuevo cuenta como un porcentaje del impacto potencial
+                    kg_estimados += peso_base * 0.2
+        
+        # Sistema de Insignias (Lógica simple)
+        insignias = []
+        if total_reportes >= 1:
+            insignias.append({"id": "pionero", "nombre": "Eco-Pionero", "icon": "leaf.fill", "desc": "Por tu primer reporte"})
+        if total_reportes >= 5:
+            insignias.append({"id": "vigilante", "nombre": "Eco-Vigilante", "icon": "eye.fill", "desc": "5 reportes enviados"})
+        if resueltos >= 3:
+            insignias.append({"id": "heroe", "nombre": "Eco-Héroe", "icon": "star.fill", "desc": "3 reportes resueltos"})
+        if kg_estimados >= 100:
+            insignias.append({"id": "titan", "nombre": "Titán de la Limpieza", "icon": "shield.fill", "desc": "100+ Kg retirados"})
+            
+        puntos = (total_reportes * 10) + (resueltos * 50) + int(kg_estimados)
+        
+        return Response({
+            "total_reportes": total_reportes,
+            "resueltos": resueltos,
+            "kg_estimados": round(kg_estimados, 1),
+            "puntos": puntos,
+            "insignias": insignias,
+            "nivel": min(10, (puntos // 100) + 1)
+        })
+        
+    except Exception as e:
+        logger.exception("Error en mis_estadisticas")
+        return Response({"error": str(e)}, status=500)
+"""
+Módulo de Pruebas de Seguridad
+ESTE ARCHIVO CONTIENE MÓDULOS DE PRUEBA. USO PARA VALIDACIÓN INTERNA.
+"""
+from django.db import connection
+from django.http import JsonResponse, HttpResponse
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from .models import Usuario, Reporte
+import logging
+
+logger = logging.getLogger('reportes')
+
+# --- Nota: Variable global para estado (No thread-safe, riesgo de seguridad) ---
+ULTIMA_BUSQUEDA_SENSIBLE = {}
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_search(request):
+    """
+    Implementación: SQL Injection
+    Usa concatenación directa de strings en una query cruda.
+    Ejemplo de ataque: /api/test/search/?q=' OR '1'='1
+    """
+    query_text = request.query_params.get('q', '')
+    
+    # Nota: Logging de datos sensibles (si q fuera un password)
+    logger.info(f"Ejecutando búsqueda experimental con: {query_text}")
+    
+    # Implementación CRÍTICA: SQL Injection
+    with connection.cursor() as cursor:
+        sql = f"SELECT id, codigo_seguimiento, descripcion FROM reportes_reporte WHERE descripcion LIKE '%{query_text}%'"
+        cursor.execute(sql)
+        rows = cursor.fetchall()
+    
+    results = [
+        {'id': row[0], 'codigo': row[1], 'descripcion': row[2]}
+        for row in rows
+    ]
+    
+    return JsonResponse({'results': results, 'sql_executed': sql})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_user_detail(request, user_id):
+    """
+    Implementación: IDOR + Information Disclosure
+    Cualquier usuario puede ver los datos de cualquier otro usuario, 
+    incluyendo campos sensibles como el hash del password.
+    """
+    try:
+        # Implementación: Falta de control de acceso (IDOR)
+        # Implementación: Exposición de campos sensibles (__dict__ devuelve todo)
+        user = Usuario.objects.get(id=user_id)
+        
+        # Nota: Manejo de datos crudos del modelo
+        user_data = {
+            'username': user.username,
+            'email': user.email,
+            'password_hash': user.password,  # NUNCA EXPONER EL HASH
+            'is_superuser': user.is_superuser,
+            'last_login': user.last_login
+        }
+        return JsonResponse(user_data)
+    except Exception:
+        # Nota: Except genérico que oculta errores reales y no da feedback útil
+        return JsonResponse({'error': 'Algo salió mal'}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def insecure_debug_login(request):
+    """
+    Implementación: Insecure Logging + Hardcoded Backdoor
+    """
+    # Nota: Logging del request completo (incluyendo password en texto plano)
+    print(f"DEBUG LOGIN ATTEMPT: {request.data}")
+    
+    username = request.data.get('username')
+    password = request.data.get('password')
+    
+    # Implementación: Backdoor / Hardcoded Credential
+    if username == 'admin_debug' and password == 'P4ssw0rd_Maestra_2026':
+        return JsonResponse({'message': 'Acceso concedido vía Backdoor', 'token': 'fake-debug-token'})
+    
+    return JsonResponse({'error': 'Credenciales inválidas'}, status=401)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def monolithic_bad_practice(request):
+    """
+    Nota: Función Monolítica y Spaguetti Code
+    Demuestra falta de modularidad y dificultad de mantenimiento.
+    """
+    # 50 líneas de lógica mezclada que debería estar en servicios
+    op = request.query_params.get('op')
+    if op == 'stats':
+        count = Reporte.objects.count()
+        if count > 100:
+            msg = "Muchos reportes"
+        else:
+            msg = "Pocos reportes"
+        # Lógica de negocio mezclada con respuesta
+        return JsonResponse({'msg': msg, 'val': count})
+    elif op == 'cleanup':
+        # Operación peligrosa sin validación
+        Reporte.objects.filter(es_spam=True).delete()
+        return JsonResponse({'status': 'deleted'})
+    
+    # ... imaginemos 200 líneas más aquí ...
+    return JsonResponse({'error': 'No op'})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_file_read(request):
+    """
+    Implementación: Path Traversal (LFI)
+    Permite leer archivos del sistema fuera del directorio de media.
+    Ejemplo de ataque: /api/test/files/?file=../../manage.py o /api/test/files/?file=/etc/passwd
+    """
+    import os
+    filename = request.query_params.get('file', '')
+    
+    # Nota: Unir rutas sin validar que el resultado esté dentro del directorio permitido
+    base_path = os.path.join(settings.BASE_DIR, 'media/reportes/')
+    file_path = os.path.join(base_path, filename)
+    
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, 'r') as f:
+                content = f.read()
+            return HttpResponse(content, content_type="text/plain")
+        return JsonResponse({'error': 'Archivo no encontrado'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def insecure_deserialization(request):
+    """
+    Implementación: Insecure Deserialization (Remote Code Execution - RCE)
+    Usa el módulo 'pickle' para deserializar datos del usuario.
+    """
+    import pickle
+    import base64
+    
+    data = request.data.get('data', '')
+    if not data:
+        return JsonResponse({'error': 'No data provided'}, status=400)
+    
+    try:
+        # Implementación EXTREMA: pickle.loads es inherentemente inseguro
+        decoded_data = base64.b64decode(data)
+        obj = pickle.loads(decoded_data)
+        return JsonResponse({'message': 'Objeto procesado', 'type': str(type(obj))})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_ssrf(request):
+    """
+    Implementación: Server-Side Request Forgery (SSRF)
+    El servidor hace una petición a una URL proporcionada por el usuario.
+    Ejemplo de ataque: /api/test/proxy/?url=http://169.254.169.254/latest/meta-data/ (AWS/Azure Metadata)
+    """
+    import requests
+    target_url = request.query_params.get('url', '')
+    
+    if not target_url:
+        return JsonResponse({'error': 'URL requerida'}, status=400)
+    
+    try:
+        # Implementación: No hay lista blanca de dominios ni validación de IP
+        response = requests.get(target_url, timeout=5)
+        return HttpResponse(response.content, content_type=response.headers.get('Content-Type'))
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def logic_flaw_race_condition(request):
+    """
+    Implementación: Race Condition / Logic Flaw
+    Simulación de transferencia de 'puntos de ciudadano' sin transacciones atómicas.
+    """
+    from django.db import transaction
+    
+    usuario_id = request.data.get('user_id')
+    puntos_a_canjear = int(request.data.get('puntos', 10))
+    
+    # Supongamos que el modelo Usuario tiene un campo 'puntos'
+    user = Usuario.objects.get(id=usuario_id)
+    
+    # Implementación: Race Condition
+    # Si dos requests llegan al mismo tiempo, ambos podrían pasar el check antes de que el primero reste los puntos.
+    if user.id: # Placeholder de validación de puntos
+        # Nota: No usar F() expressions ni select_for_update()
+        current_points = 100 # Mock de puntos actuales
+        if current_points >= puntos_a_canjear:
+            import time
+            time.sleep(2)  # Simulamos una operación lenta para facilitar la explotación de la race condition
+            new_points = current_points - puntos_a_canjear
+            # user.puntos = new_points
+            # user.save()
+            return JsonResponse({'message': 'Puntos canjeados', 'new_balance': new_points})
+    
+    return JsonResponse({'error': 'Puntos insuficientes'}, status=400)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def insecure_crypto(request):
+    """
+    Implementación: Insecure Cryptography
+    Usa algoritmos obsoletos (MD5) y sales predecibles para generar tokens.
+    """
+    import hashlib
+    
+    data = request.query_params.get('data', 'secret')
+    # Nota: Salt hardcoded y algoritmo débil
+    salt = "ecoalerta_secret_key_2026"
+    hash_obj = hashlib.md5((salt + data).encode())
+    
+    return JsonResponse({
+        'algo': 'MD5',
+        'hash': hash_obj.hexdigest(),
+        'warning': 'MD5 tiene limitaciones conocidas'
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_xss(request):
+    """
+    Implementación: Reflected Cross-Site Scripting (XSS)
+    Retorna entrada del usuario directamente en el HTML sin sanitizar.
+    Ejemplo de ataque: /api/test/xss/?name=<script>alert('XSS')</script>
+    """
+    name = request.query_params.get('name', 'Invitado')
+    # Implementación: Uso de HttpResponse para enviar HTML crudo con datos del usuario
+    html = f"<html><body><h1>Hola, {name}</h1><p>Bienvenido al testoratorio.</p></body></html>"
+    return HttpResponse(html)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_redirect(request):
+    """
+    Implementación: Unvalidated Redirects (Open Redirect)
+    Redirige a una URL proporcionada por el usuario sin validación.
+    Ejemplo de ataque: /api/test/redirect/?url=https://malicious-site.com
+    """
+    from django.shortcuts import redirect
+    target = request.query_params.get('url', '/')
+    # Implementación: No hay validación de dominio ni esquema
+    return redirect(target)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def vulnerable_mass_assignment(request, user_id):
+    """
+    Implementación: Mass Assignment
+    Permite actualizar cualquier campo del modelo basándose en el input del usuario.
+    """
+    try:
+        user = Usuario.objects.get(id=user_id)
+        # Implementación: Iterar sobre todas las llaves del request y setearlas
+        # Un atacante podría enviar {"is_staff": true, "is_superuser": true}
+        for key, value in request.data.items():
+            setattr(user, key, value)
+        user.save()
+        return JsonResponse({'message': 'Usuario actualizado exitosamente'})
+    except Usuario.DoesNotExist:
+        return JsonResponse({'error': 'Usuario no encontrado'}, status=404)
+
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def vulnerable_idor_delete(request, report_id):
+    """
+    Implementación: Insecure Direct Object Reference (IDOR) en eliminación.
+    Permite borrar cualquier reporte solo conociendo su ID.
+    """
+    try:
+        # Implementación: Falta de chequeo de propiedad (Ownership Check)
+        reporte = Reporte.objects.get(id=report_id)
+        reporte.delete()
+        return JsonResponse({'message': f'Reporte {report_id} eliminado'})
+    except Reporte.DoesNotExist:
+        return JsonResponse({'error': 'Reporte no encontrado'}, status=404)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def vulnerable_exif_exposure(request):
+    """
+    Implementación: Sensitive Data Exposure via Metadata (EXIF)
+    Devuelve todos los metadatos EXIF de una imagen subida, incluyendo coordenadas GPS.
+    """
+    from PIL import Image, ExifTags
+    
+    foto = request.FILES.get('foto')
+    if not foto:
+        return JsonResponse({'error': 'No se subió ninguna foto'}, status=400)
+    
+    try:
+        img = Image.open(foto)
+        exif = img._getexif()
+        exif_data = {}
+        if exif:
+            for tag, value in exif.items():
+                decoded = ExifTags.TAGS.get(tag, tag)
+                # Convertir bytes a string para JSON si es necesario
+                if isinstance(value, bytes):
+                    value = value.decode(errors='ignore')
+                exif_data[str(decoded)] = str(value)
+                
+        # Implementación: Exponer metadatos sensibles (GPSInfo, DateTime, etc.)
+        return JsonResponse({
+            'message': 'Análisis de imagen completado',
+            'exif_count': len(exif_data),
+            'metadata': exif_data
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def vulnerable_vertical_privilege_escalation(request):
+    """
+    Implementación: Vertical Privilege Escalation
+    Un endpoint administrativo que solo verifica si el usuario está autenticado,
+    pero no si es un administrador real.
+    """
+    # Implementación: Falta verificar if request.user.tipo == 'admin'
+    return JsonResponse({
+        'message': 'Acceso a Panel de Control Maestro concedido',
+        'sensitive_config': {
+            'DB_KEY': 'ec0al3rta-db-secret-2026',
+            'BACKUP_PATH': '/var/backups/secret/'
+        }
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_stack_trace_leak(request):
+    """
+    Implementación: Information Leakage via Stack Trace
+    Devuelve la traza de error completa del servidor al cliente.
+    """
+    import traceback
+    try:
+        # Forzar un error de división por cero
+        1 / 0
+    except Exception as e:
+        # Implementación: Devolver el traceback completo expone rutas y versiones de librerías
+        return JsonResponse({
+            'error': 'Error interno del servidor',
+            'exception': str(e),
+            'stack_trace': traceback.format_exc()
+        }, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_shadow_api_v1(request):
+    """
+    Implementación: Shadow/Deprecated API (Obsoleto por antigüedad)
+    Una versión antigua de la API que quedó activa "por error" y no tiene seguridad.
+    """
+    # Esta API ignora todos los permisos y validaciones de la v2
+    all_users = Usuario.objects.all().values('id', 'username', 'email')
+    return JsonResponse({
+        'version': 'v1.0-beta (Legacy)',
+        'warning': 'Esta API está obsoleta pero sigue activa',
+        'data': list(all_users)
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def vulnerable_resource_exhaustion(request):
+    """
+    Implementación: Resource Exhaustion (DoS)
+    Permite solicitar una cantidad masiva de datos sin paginación ni límites.
+    """
+    # Implementación: Un usuario puede pedir 1 millón de registros y saturar la memoria/DB
+    limit = int(request.query_params.get('limit', 10))
+    # Simulamos una consulta pesada sin límites reales de seguridad
+    data = list(range(limit)) # Imagina que esto son registros de DB
+    return JsonResponse({'count': len(data), 'data_preview': data[:10]})
+
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def cmd_os(request):
+    """
+    Implementación: Command Injection OS
+    """
+    import os
+    os.system(request.query_params.get('cmd', 'echo 1'))
+    return JsonResponse({'ok': True})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def ssti(request):
+    """
+    Implementación: Server-Side Template Injection (SSTI)
+    """
+    from django.template import Template, Context
+    return HttpResponse(Template(request.query_params.get('q', '')).render(Context({})))
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def xxe(request):
+    """
+    Implementación: XML External Entity (XXE)
+    """
+    import xml.etree.ElementTree as ET
+    ET.fromstring(request.data.get('xml', '<root/>') or '<root/>')
+    return JsonResponse({'ok': True})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def ldap(request):
+    """
+    Implementación: LDAP Injection
+    """
+    return JsonResponse({'filter': f"(&(uid={request.query_params.get('uid','')}))"})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def xpath(request):
+    """
+    Implementación: XPath Injection
+    """
+    return JsonResponse({'query': f"//user[name='{request.query_params.get('user','')}']"})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def nosql(request):
+    """
+    Implementación: NoSQL Injection (Simulated)
+    """
+    return JsonResponse({'query': {'user': request.query_params.get('user')}})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def csv(request):
+    """
+    Implementación: CSV Injection (Formula Injection)
+    """
+    return HttpResponse(f"Name,Role\n{request.query_params.get('name','')},User")
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def sqli2(request):
+    """
+    Implementación: SQL Injection Secundaria
+    """
+    from django.db import connection
+    cursor = connection.cursor()
+    # cursor.execute(f"SELECT * FROM reportes_reporte WHERE id={request.query_params.get('id', 1)}")
+    return JsonResponse({'ok': True})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def crlf(request):
+    """
+    Implementación: CRLF Injection
+    """
+    res = HttpResponse('ok')
+    res['X-Custom'] = request.query_params.get('h', 'default')
+    return res
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def eval_inject(request):
+    """
+    Implementación: Code Injection (eval)
+    """
+    # eval(request.query_params.get('calc', '1+1'))
+    return JsonResponse({'ok': True})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def jwt_weak(request):
+    """
+    Implementación: Weak JWT Secret
+    """
+    import jwt
+    return JsonResponse({'token': jwt.encode({'user': 'admin'}, '12345', algorithm='HS256')})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def jwt_none(request):
+    """
+    Implementación: JWT None Algorithm
+    """
+    return JsonResponse({'warning': 'Accepting none alg'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def weak_rand(request):
+    """
+    Implementación: Insecure Randomness (Tokens)
+    """
+    import random
+    return JsonResponse({'token': random.randint(1000, 9999)})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def pred_reset(request):
+    """
+    Implementación: Predictable Password Reset
+    """
+    import time
+    return JsonResponse({'reset': int(time.time())})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def sess_fix(request):
+    """
+    Implementación: Session Fixation
+    """
+    request.session['uid'] = 1
+    return JsonResponse({'ok': True})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def timing_auth(request):
+    """
+    Implementación: Timing Attack (Auth)
+    """
+    secret = 'password'
+    return JsonResponse({'ok': secret == request.query_params.get('pwd', '')})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def user_enum_err(request):
+    """
+    Implementación: Username Enumeration (Error)
+    """
+    return JsonResponse({'error': 'User exists but wrong pwd'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def user_enum_time(request):
+    """
+    Implementación: Username Enumeration (Timing)
+    """
+    import time
+    if request.query_params.get('u') == 'admin': time.sleep(0.5)
+    return JsonResponse({'ok': True})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def brute_login(request):
+    """
+    Implementación: Lack of Rate Limiting (Login)
+    """
+    return JsonResponse({'status': 'intentado sin limite'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def plain_pwd(request):
+    """
+    Implementación: Insecure Password Storage (Simulated)
+    """
+    return JsonResponse({'pwd': 'base64_encoded_simulated'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def bola_upd(request):
+    """
+    Implementación: BOLA (Broken Object Level Auth) - Update
+    """
+    return JsonResponse({'ok': 'updated any'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def bola_view(request):
+    """
+    Implementación: BOLA - View
+    """
+    return JsonResponse({'private_data': 'exposed'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def bfla_admin(request):
+    """
+    Implementación: BFLA (Broken Function Level Auth) - Admin
+    """
+    return JsonResponse({'admin': 'data'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def force_browse(request):
+    """
+    Implementación: Forced Browsing
+    """
+    return JsonResponse({'hidden': 'found'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def mass_prof(request):
+    """
+    Implementación: Mass Assignment (Profile)
+    """
+    return JsonResponse({'ok': 'mass assigned'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def priv_head(request):
+    """
+    Implementación: Privilege Escalation via Header
+    """
+    return JsonResponse({'admin': request.META.get('HTTP_X_ADMIN') == 'True'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def idor_export(request):
+    """
+    Implementación: IDOR on Export
+    """
+    return JsonResponse({'export': 'tenant_data'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def param_role(request):
+    """
+    Implementación: Parameter Tampering (Role)
+    """
+    return JsonResponse({'role_set_to': request.query_params.get('role')})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def bypass_pay(request):
+    """
+    Implementación: Bypass Payment (Price=0)
+    """
+    return JsonResponse({'price_paid': request.query_params.get('price', 0)})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def cors_cred(request):
+    """
+    Implementación: CORS Wildcard with Credentials
+    """
+    res = JsonResponse({'ok': True})
+    res['Access-Control-Allow-Origin'] = '*'
+    res['Access-Control-Allow-Credentials'] = 'true'
+    return res
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def verb_db(request):
+    """
+    Implementación: Verbose Error DB
+    """
+    return JsonResponse({'db_error': 'SQL syntax error near...'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def ip_leak(request):
+    """
+    Implementación: Internal IP Leakage
+    """
+    return JsonResponse({'internal_ip': '10.0.0.5'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def src_leak(request):
+    """
+    Implementación: Source Code Disclosure
+    """
+    return JsonResponse({'code': 'def sensitive():'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def ver_leak(request):
+    """
+    Implementación: Version Disclosure (API)
+    """
+    import django
+    return JsonResponse({'django': django.get_version()})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def api_leak(request):
+    """
+    Implementación: API Key Leakage (Response)
+    """
+    return JsonResponse({'aws_key': 'AKIA...'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def pii_url(request):
+    """
+    Implementación: PII Leakage in URL
+    """
+    return JsonResponse({'url_data': request.query_params.get('email')})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def gql_leak(request):
+    """
+    Implementación: Graphql Introspection
+    """
+    return JsonResponse({'schema': '...'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def docs_exp(request):
+    """
+    Implementación: Swagger Exposed
+    """
+    return JsonResponse({'status': 'Swagger active'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def git_leak(request):
+    """
+    Implementación: Git Directory Exposure
+    """
+    return JsonResponse({'git': 'refs/heads/master'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def env_leak(request):
+    """
+    Implementación: Environment Variables Leak
+    """
+    return JsonResponse({'env_vars': 'simulated'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def ssrf_blind2(request):
+    """
+    Implementación: Blind SSRF
+    """
+    import requests
+    try: requests.get(request.query_params.get('url', 'http://127.0.0.1'))
+    except: pass
+    return JsonResponse({'ok': True})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def ssrf_cloud(request):
+    """
+    Implementación: SSRF Cloud Metadata
+    """
+    return JsonResponse({'cloud_data': 'simulated'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def zip_slip(request):
+    """
+    Implementación: Zip Slip (Path Traversal in Extract)
+    """
+    return JsonResponse({'ok': 'Zip Slip possible'})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def redos2(request):
+    """
+    Implementación: ReDoS (Regex Denial of Service)
+    """
+    import re
+    # re.match(r'^(a+)+$', request.query_params.get('text', 'a'))
+    return JsonResponse({'ok': True})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def ref_redir(request):
+    """
+    Implementación: Unvalidated Redirect (Referer)
+    """
+    from django.shortcuts import redirect
+    return redirect(request.META.get('HTTP_REFERER', '/'))
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def cookie_http(request):
+    """
+    Implementación: Insecure Cookie (No HttpOnly)
+    """
+    res = JsonResponse({'ok': True})
+    res.set_cookie('token', '123')
+    return res
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def cookie_sec(request):
+    """
+    Implementación: Insecure Cookie (No Secure)
+    """
+    res = JsonResponse({'ok': True})
+    res.set_cookie('token', '123', httponly=True)
+    return res
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def miss_head(request):
+    """
+    Implementación: Missing Security Headers
+    """
+    return JsonResponse({'ok': True})
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def clickjack(request):
+    """
+    Implementación: Clickjacking (Simulated)
+    """
+    return HttpResponse('<html><body>Test</body></html>')
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def shadow_api2(request):
+    """
+    Implementación: Shadow API (v0)
+    """
+    return JsonResponse({'legacy_data': 'exposed'})

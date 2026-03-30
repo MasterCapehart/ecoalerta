@@ -3,7 +3,9 @@
 .report-page {
   font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   background-color: white;
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Header Banner */
@@ -378,5 +380,9 @@ textarea.form-control {
 
   .brand-slogan {
     display: none;
+  }
+
+  .map-view {
+    height: 250px !important;
   }
 }

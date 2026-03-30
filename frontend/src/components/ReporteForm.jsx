@@ -47,7 +47,7 @@ const ReporteForm = () => {
   const [loading, setLoading] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [codigoSeguimiento, setCodigoSeguimiento] = useState(null)
-  const [mapCenter, setMapCenter] = useState([-29.95, -71.33])
+  const [mapCenter, setMapCenter] = useState([-29.9027, -71.252])
   const [aiSuggestion, setAiSuggestion] = useState(null)
   const [duplicateCheck, setDuplicateCheck] = useState({
     loading: false,
@@ -349,7 +349,14 @@ const ReporteForm = () => {
         {/* Left: Map */}
         <div className="map-container">
           <div className={`map-view ${errors.ubicacion ? 'has-error' : ''}`}>
-            <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+            <MapContainer 
+              center={mapCenter} 
+              zoom={13} 
+              style={{ height: '100%', width: '100%' }} 
+              zoomControl={false}
+              dragging={!L.Browser.mobile}
+              tap={!L.Browser.mobile}
+            >
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; OpenStreetMap'

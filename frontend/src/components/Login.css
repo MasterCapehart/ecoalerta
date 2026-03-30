@@ -425,8 +425,7 @@
 @media (max-width: 768px) {
   .login-container {
     padding: 20px;
-    align-items: flex-start;
-    padding-top: 40px;
+    align-items: center;
   }
 
   /* Reducir círculos decorativos en móvil */
@@ -519,7 +518,6 @@
 @media (max-width: 480px) {
   .login-container {
     padding: 15px;
-    padding-top: 30px;
   }
 
   /* Ocultar o reducir más los círculos decorativos */
@@ -643,7 +641,6 @@
 @media (max-width: 360px) {
   .login-container {
     padding: 10px;
-    padding-top: 20px;
   }
 
   .login-box {
