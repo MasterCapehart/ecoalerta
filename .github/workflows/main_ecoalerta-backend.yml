@@ -15,27 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python version
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies and create zip
-        run: |
-          cd backend
-          pip install -r requirements.txt --target=".python_packages/lib/site-packages"
-          cd ..
-          zip -r backend.zip backend/ \
-            --exclude "backend/.python_packages/*" \
-            --exclude "backend/__pycache__/*" \
-            --exclude "backend/**/__pycache__/*" \
-            --exclude "backend/*.pyc" \
-            --exclude "backend/**/*.pyc"
-
-      - name: Deploy to Azure Web App via publish profile
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'ecoalerta-backend-new'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: backend.zip
+          package: backend/
