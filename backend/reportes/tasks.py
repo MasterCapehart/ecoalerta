@@ -235,6 +235,7 @@ def verificar_sla_reportes():
                 alertas_enviadas += 1
                 reporte.sla_ultima_alerta = ahora
                 reporte.save(update_fields=['sla_ultima_alerta'])
+                
 
         for reporte in reportes_excedidos:
             if reporte.sla_escalado:

@@ -146,7 +146,7 @@ class SearchService:
         return R * c
 
 
-# --- IMPLEMENTACIONES DE PRUEBA ---
+
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

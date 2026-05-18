@@ -2,7 +2,7 @@
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 # More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
 
-name: Build and deploy Python app to Azure Web App - ecoalerta-backend
+name: Build and deploy Python app to Azure Web App - ecoalerta-backend-new
 
 # DESACTIVADO - Usar deploy-backend.yml en su lugar
 # Este workflow fue creado automáticamente por Azure pero no está configurado correctamente
@@ -76,6 +76,6 @@ jobs:
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'ecoalerta-backend'
+          app-name: 'ecoalerta-backend-new'
           slot-name: 'Production'
           

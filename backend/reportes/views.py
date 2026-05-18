@@ -82,12 +82,10 @@ LOCAL_PREDICTIONS_ENABLED = (
 
 
 class ReporteViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for managing reports.
-    """
+   
     queryset = Reporte.objects.all().order_by('-fecha_creacion')
     serializer_class = ReporteSerializer
-    # Strict throttling for creation
+    
     throttle_classes = [ReportSubmissionAnonThrottle, ReportSubmissionProRateThrottle]
     
     def get_permissions(self):
@@ -1967,6 +1965,7 @@ def calcular_sla_reporte(request, reporte_id):
             {'error': 'Reporte no encontrado'},
             status=status.HTTP_404_NOT_FOUND
         )
+    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2130,6 +2129,7 @@ def vulnerable_user_detail(request, user_id):
     except Exception:
         # Nota: Except genérico que oculta errores reales y no da feedback útil
         return JsonResponse({'error': 'Algo salió mal'}, status=500)
+
 
 
 @api_view(['POST'])
@@ -2586,18 +2586,13 @@ def weak_rand(request):
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def pred_reset(request):
-    """
-    Implementación: Predictable Password Reset
-    """
+   
     import time
     return JsonResponse({'reset': int(time.time())})
 
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def sess_fix(request):
-    """
-    Implementación: Session Fixation
-    """
     request.session['uid'] = 1
     return JsonResponse({'ok': True})
 

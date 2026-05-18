@@ -1,7 +1,7 @@
 // Configuración de la API
 // En producción, usar la URL del backend en Azure
 const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-const PRODUCTION_API_URL = 'https://ecoalerta-backend-cmfbgrb3bgd0ephd.chilecentral-01.azurewebsites.net';
+const PRODUCTION_API_URL = 'https://ecoalerta-backend-new.azurewebsites.net';
 const DEVELOPMENT_API_URL = 'http://localhost:8000';
 
 // Validar y limpiar la URL de la variable de entorno si existe
