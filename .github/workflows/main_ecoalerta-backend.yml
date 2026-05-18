@@ -15,15 +15,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies into backend folder
+      - name: Create deployment zip from backend folder
         run: |
           cd backend
-          pip install -r requirements.txt --target=".python_packages/lib/site-packages"
+          zip -r ../backend_deploy.zip . \
+            --exclude "__pycache__/*" \
+            --exclude "**/__pycache__/*" \
+            --exclude "*.pyc" \
+            --exclude ".venv/*" \
+            --exclude "venv/*" \
+            --exclude "antenv/*" \
+            --exclude ".python_packages/*"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
@@ -31,4 +33,4 @@ jobs:
           app-name: 'ecoalerta-backend-new'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: backend/
+          package: backend_deploy.zip
