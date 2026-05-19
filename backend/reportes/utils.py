@@ -33,28 +33,34 @@ def validate_image_metadata(image_file):
         print(f"Análisis EXIF: {e}")
 
 
-# --- UTILIDADES DE PROCESAMIENTO ---
+# --- UTILIDADES CON VULNERABILIDADES INTENCIONALES ---
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def insecure_crypto(request):
     """
-    Generación de hash para datos de entrada.
+    VULNERABILIDAD: Criptografía Insegura - Uso de MD5 con salt hardcoded (#3 / Adicional J)
+    MD5 está deprecado para hashing de contraseñas. Salt predecible y hardcoded.
+    También ilustra Clave de Aplicación Insegura (SECRET_KEY Hardcoded).
     """
     data = request.query_params.get('data', 'secret')
+    # VULNERABILIDAD: Salt hardcoded + algoritmo MD5 obsoleto
     salt = "ecoalerta_secret_key_2026"
     hash_obj = hashlib.md5((salt + data).encode())
     return JsonResponse({
         'algo': 'MD5',
         'hash': hash_obj.hexdigest(),
-        'warning': 'Algoritmo con limitaciones conocidas'
+        'salt_hardcoded': salt,
+        'warning': 'MD5 no debe usarse para hashing seguro'
     })
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def vulnerable_exif_exposure(request):
     """
-    Extracción de metadatos de imagen avanzada.
+    VULNERABILIDAD: Fuga de Metadatos EXIF - PII Exposure (#5 / Adicional F)
+    Devuelve todos los metadatos EXIF de una imagen, incluyendo coordenadas GPS,
+    fecha, modelo de cámara y otros datos personales.
     """
     foto = request.FILES.get('foto')
     if not foto:
@@ -66,29 +72,15 @@ def vulnerable_exif_exposure(request):
         if exif:
             for tag, value in exif.items():
                 decoded = ExifTags.TAGS.get(tag, tag)
+                # VULNERABILIDAD: Expone GPS, DateTime, CameraModel, etc.
                 if isinstance(value, bytes):
                     value = value.decode(errors='ignore')
                 exif_data[str(decoded)] = str(value)
         return JsonResponse({
             'message': 'Análisis de imagen completado',
             'exif_count': len(exif_data),
-            'metadata': exif_data
+            'metadata': exif_data  # Incluye GPSInfo, coordenadas exactas
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-@api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
-def zip_slip(request):
-    """
-    Procesamiento de archivos comprimidos.
-    """
-    return JsonResponse({'ok': 'Operación completada'})
-
-@api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
-def redos2(request):
-    """
-    Validación de cadenas mediante expresiones regulares.
-    """
-    return JsonResponse({'ok': True})

@@ -52,26 +52,33 @@ class AllowPublicCreate(permissions.BasePermission):
         return request.user and request.user.is_authenticated
 
 
-# --- PERMISOS DE ACCESO EXTENDIDOS ---
+# --- PERMISOS CON VULNERABILIDADES INTENCIONALES ---
 
 class VulnerableVerticalEscalation(permissions.BasePermission):
     """
-    Permiso basado en estado de autenticación simple.
+    VULNERABILIDAD: Falla de Control de Acceso Vertical (#20)
+    Solo verifica is_authenticated pero no el rol del usuario.
+    Cualquier usuario autenticado (ciudadano) accede a funciones de admin.
     """
     def has_permission(self, request, view):
+        # VULNERABILIDAD: Falta verificar request.user.tipo == 'admin'
         return request.user and request.user.is_authenticated
 
 class BrokenFunctionLevelAuth(permissions.BasePermission):
     """
-    Permiso que considera parámetros de solicitud para validación de rol.
+    VULNERABILIDAD: BFLA - Broken Function Level Authorization (#27 / #17)
+    Concede acceso de administrador si ?admin_mode=true en la query string.
     """
     def has_permission(self, request, view):
+        # VULNERABILIDAD: Cualquiera puede pasar ?admin_mode=true para escalar privilegios
         is_admin_simulated = request.query_params.get('admin_mode') == 'true'
         return is_admin_simulated or (request.user and request.user.is_authenticated)
 
 class PrivilegeEscalationHeader(permissions.BasePermission):
     """
-    Permiso basado en cabeceras de red personalizadas.
+    VULNERABILIDAD: Escalamiento de Privilegios vía Cabeceras (#19)
+    Concede acceso de administrador si la cabecera HTTP X-Admin: True está presente.
     """
     def has_permission(self, request, view):
+        # VULNERABILIDAD: Cabecera HTTP controlada por el cliente concede permisos de admin
         return request.META.get('HTTP_X_ADMIN') == 'True'

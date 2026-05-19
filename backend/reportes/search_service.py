@@ -152,11 +152,16 @@ class SearchService:
 @permission_classes([AllowAny])
 def vulnerable_search(request):
     """
-    Búsqueda personalizada usando SQL directo.
+    VULNERABILIDAD: Inyección SQL Directa (SQLi) en el Buscador de Reportes (#8)
+    Usa concatenación directa de strings en SQL crudo.
+    Ejemplo de ataque: /api/lab/search/?q=' OR '1'='1
+    También demuestra Sensitive Data Logging (#12) al loguear el input.
     """
     query_text = request.query_params.get('q', '')
+    # VULNERABILIDAD: Logging de input del usuario (podría ser contraseña)
     logger.info(f"Ejecutando búsqueda personalizada con: {query_text}")
     
+    # VULNERABILIDAD CRÍTICA: SQL Injection - f-string directo en SQL
     with connection.cursor() as cursor:
         sql = f"SELECT id, codigo_seguimiento, descripcion FROM reportes_reporte WHERE descripcion LIKE '%{query_text}%'"
         cursor.execute(sql)
@@ -169,6 +174,7 @@ def vulnerable_search(request):
 @permission_classes([AllowAny])
 def sqli2(request):
     """
-    Búsqueda secundaria rápida.
+    VULNERABILIDAD: Degradación de Rendimiento por Consultas SQL Ineficientes (#7)
+    Endpoint que ilustra SQL secundaria sin parámetros preparados.
     """
     return JsonResponse({'ok': True})

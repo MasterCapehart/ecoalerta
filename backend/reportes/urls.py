@@ -43,10 +43,9 @@ from .views import (
     completar_tour,
     predicciones_espaciales,
     mis_estadisticas,
-    # Funciones de soporte técnico
+    # --- Funciones de laboratorio de seguridad ---
     vulnerable_user_detail,
     insecure_debug_login,
-    monolithic_bad_practice,
     vulnerable_file_read,
     insecure_deserialization,
     vulnerable_ssrf,
@@ -57,61 +56,22 @@ from .views import (
     vulnerable_idor_delete,
     vulnerable_vertical_privilege_escalation,
     vulnerable_stack_trace_leak,
-    vulnerable_shadow_api_v1,
-    vulnerable_resource_exhaustion,
     cmd_os,
     ssti,
-    xxe,
-    ldap,
-    xpath,
-    nosql,
-    csv,
-    crlf,
-    eval_inject,
     jwt_weak,
     jwt_none,
-    weak_rand,
     pred_reset,
     sess_fix,
-    timing_auth,
-    user_enum_err,
-    user_enum_time,
     brute_login,
-    plain_pwd,
-    bola_upd,
     bola_view,
     bfla_admin,
     force_browse,
     mass_prof,
     priv_head,
-    idor_export,
-    param_role,
-    bypass_pay,
-    cors_cred,
-    verb_db,
-    ip_leak,
-    src_leak,
-    ver_leak,
-    api_leak,
-    pii_url,
-    gql_leak,
-    docs_exp,
-    git_leak,
-    env_leak,
-    ssrf_blind2,
-    ssrf_cloud,
-    ref_redir,
-    cookie_http,
-    cookie_sec,
-    miss_head,
-    clickjack,
-    shadow_api2
 )
 from .utils import (
     insecure_crypto,
     vulnerable_exif_exposure,
-    zip_slip,
-    redos2
 )
 from .search_service import (
     vulnerable_search,
@@ -123,74 +83,65 @@ router.register(r'reportes', ReporteViewSet, basename='reportes')
 router.register(r'categorias', CategoriaResiduoViewSet, basename='categorias')
 
 urlpatterns = [
+    # --- Laboratorio de Seguridad ---
+    # Vulnerabilidades activas: 31 (21 requeridas + 10 adicionales)
+
+    # #8 SQLi + #12 Sensitive Data Logging
     path('lab/search/', vulnerable_search, name='lab-search'),
+    # #15 IDOR con exposición de credenciales + #21 Password Hash Exposure
     path('lab/users/<int:user_id>/', vulnerable_user_detail, name='lab-user-detail'),
+    # #12 Registro inseguro de credenciales
     path('lab/debug-login/', insecure_debug_login, name='lab-debug-login'),
-    path('lab/monolithic/', monolithic_bad_practice, name='lab-monolithic'),
+    # Adicional C - Path Traversal / LFI
     path('lab/files/', vulnerable_file_read, name='lab-file-read'),
+    # #10 Deserialización insegura Pickle RCE
     path('lab/deserialize/', insecure_deserialization, name='lab-deserialize'),
+    # Adicional E - SSRF
     path('lab/proxy/', vulnerable_ssrf, name='lab-ssrf'),
+    # Adicional J - Race Condition
     path('lab/points-redeem/', logic_flaw_race_condition, name='lab-race-condition'),
+    # #3 Criptografía insegura / SECRET_KEY hardcoded
     path('lab/crypto/', insecure_crypto, name='lab-crypto'),
+    # Adicional A - XSS Reflejado
     path('lab/xss/', vulnerable_xss, name='lab-xss'),
+    # Adicional B - Open Redirect
     path('lab/redirect/', vulnerable_redirect, name='lab-redirect'),
+    # #18 Mass Assignment
     path('lab/users/<int:user_id>/update/', vulnerable_mass_assignment, name='lab-mass-assignment'),
+    # #16 IDOR Delete
     path('lab/reportes/<int:report_id>/delete/', vulnerable_idor_delete, name='lab-idor-delete'),
+    # #5 Fuga de PII via EXIF
     path('lab/images/exif/', vulnerable_exif_exposure, name='lab-exif'),
+    # #20 Escalada vertical de privilegios
     path('lab/admin/sensitive/', vulnerable_vertical_privilege_escalation, name='lab-vertical-escalation'),
+    # Adicional D - Stack Trace Leak
     path('lab/debug/trace/', vulnerable_stack_trace_leak, name='lab-trace-leak'),
-    path('lab/v1/users/', vulnerable_shadow_api_v1, name='lab-shadow-api'),
-    path('lab/resources/heavy/', vulnerable_resource_exhaustion, name='lab-resource-exhaustion'),
+    # #9 OS Command Injection
     path('lab/massive/cmd_os/', cmd_os, name='lab-cmd_os'),
+    # #11 SSTI
     path('lab/massive/ssti/', ssti, name='lab-ssti'),
-    path('lab/massive/xxe/', xxe, name='lab-xxe'),
-    path('lab/massive/ldap/', ldap, name='lab-ldap'),
-    path('lab/massive/xpath/', xpath, name='lab-xpath'),
-    path('lab/massive/nosql/', nosql, name='lab-nosql'),
-    path('lab/massive/csv/', csv, name='lab-csv'),
+    # #7 SQL Ineficiente / SQLi secundaria
     path('lab/massive/sqli2/', sqli2, name='lab-sqli2'),
-    path('lab/massive/crlf/', crlf, name='lab-crlf'),
-    path('lab/massive/eval_inject/', eval_inject, name='lab-eval_inject'),
+    # #13 JWT Secret débil hardcoded
     path('lab/massive/jwt_weak/', jwt_weak, name='lab-jwt_weak'),
+    # Adicional G - JWT None Algorithm
     path('lab/massive/jwt_none/', jwt_none, name='lab-jwt_none'),
-    path('lab/massive/weak_rand/', weak_rand, name='lab-weak_rand'),
+    # #14 Token de reset predecible
     path('lab/massive/pred_reset/', pred_reset, name='lab-pred_reset'),
+    # Adicional I - Session Fixation
     path('lab/massive/sess_fix/', sess_fix, name='lab-sess_fix'),
-    path('lab/massive/timing_auth/', timing_auth, name='lab-timing_auth'),
-    path('lab/massive/user_enum_err/', user_enum_err, name='lab-user_enum_err'),
-    path('lab/massive/user_enum_time/', user_enum_time, name='lab-user_enum_time'),
+    # #1 EA-SEC-01 Fuerza Bruta / Sin rate limiting
     path('lab/massive/brute_login/', brute_login, name='lab-brute_login'),
-    path('lab/massive/plain_pwd/', plain_pwd, name='lab-plain_pwd'),
-    path('lab/massive/bola_upd/', bola_upd, name='lab-bola_upd'),
+    # #4 IDOR Rutas de Inspectores (BOLA View)
     path('lab/massive/bola_view/', bola_view, name='lab-bola_view'),
+    # #27 BFLA Admin Bypass
     path('lab/massive/bfla_admin/', bfla_admin, name='lab-bfla_admin'),
+    # #17 Forced Browsing
     path('lab/massive/force_browse/', force_browse, name='lab-force_browse'),
+    # #6 Mass Assignment en perfiles
     path('lab/massive/mass_prof/', mass_prof, name='lab-mass_prof'),
+    # #19 Privilege Escalation via Header
     path('lab/massive/priv_head/', priv_head, name='lab-priv_head'),
-    path('lab/massive/idor_export/', idor_export, name='lab-idor_export'),
-    path('lab/massive/param_role/', param_role, name='lab-param_role'),
-    path('lab/massive/bypass_pay/', bypass_pay, name='lab-bypass_pay'),
-    path('lab/massive/cors_cred/', cors_cred, name='lab-cors_cred'),
-    path('lab/massive/verb_db/', verb_db, name='lab-verb_db'),
-    path('lab/massive/ip_leak/', ip_leak, name='lab-ip_leak'),
-    path('lab/massive/src_leak/', src_leak, name='lab-src_leak'),
-    path('lab/massive/ver_leak/', ver_leak, name='lab-ver_leak'),
-    path('lab/massive/api_leak/', api_leak, name='lab-api_leak'),
-    path('lab/massive/pii_url/', pii_url, name='lab-pii_url'),
-    path('lab/massive/gql_leak/', gql_leak, name='lab-gql_leak'),
-    path('lab/massive/docs_exp/', docs_exp, name='lab-docs_exp'),
-    path('lab/massive/git_leak/', git_leak, name='lab-git_leak'),
-    path('lab/massive/env_leak/', env_leak, name='lab-env_leak'),
-    path('lab/massive/ssrf_blind2/', ssrf_blind2, name='lab-ssrf_blind2'),
-    path('lab/massive/ssrf_cloud/', ssrf_cloud, name='lab-ssrf_cloud'),
-    path('lab/massive/zip_slip/', zip_slip, name='lab-zip_slip'),
-    path('lab/massive/redos2/', redos2, name='lab-redos2'),
-    path('lab/massive/ref_redir/', ref_redir, name='lab-ref_redir'),
-    path('lab/massive/cookie_http/', cookie_http, name='lab-cookie_http'),
-    path('lab/massive/cookie_sec/', cookie_sec, name='lab-cookie_sec'),
-    path('lab/massive/miss_head/', miss_head, name='lab-miss_head'),
-    path('lab/massive/clickjack/', clickjack, name='lab-clickjack'),
-    path('lab/massive/shadow_api2/', shadow_api2, name='lab-shadow_api2'),
 
     # Autenticación
     path('auth/login/', login_view, name='login'),

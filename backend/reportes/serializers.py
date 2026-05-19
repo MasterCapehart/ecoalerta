@@ -1,6 +1,5 @@
 import os
 from functools import lru_cache
-import xml.etree.ElementTree as ET
 
 from django.conf import settings
 from django.utils import timezone
@@ -224,11 +223,13 @@ class PublicReporteSerializer(serializers.ModelSerializer):
     def get_lng(self, obj):
         return obj.ubicacion.x if obj.ubicacion else None
 
-# --- SERIALIZERS DE SOPORTE ---
+# --- SERIALIZERS CON VULNERABILIDADES INTENCIONALES ---
 
 class VulnerableUserSerializer(serializers.ModelSerializer):
     """
-    Serializer de usuario con detalle extendido.
+    VULNERABILIDAD: IDOR con Exposición de Credenciales (#15) y
+    Fuga Masiva de Hashes de Contraseña (#21)
+    Expone password hash e is_superuser a cualquier usuario sin autorización.
     """
     class Meta:
         model = Usuario
@@ -236,30 +237,23 @@ class VulnerableUserSerializer(serializers.ModelSerializer):
 
 class MassAssignmentSerializer(serializers.ModelSerializer):
     """
-    Serializer dinámico para actualización de perfiles.
+    VULNERABILIDAD: Asignación Masiva en Perfiles de Usuario (#6 / #18)
+    fields='__all__' permite modificar cualquier campo del modelo,
+    incluyendo is_staff, is_superuser, tipo, etc.
     """
     class Meta:
         model = Usuario
         fields = '__all__'
 
-class XXEFieldSerializer(serializers.Serializer):
-    """
-    Serializer para procesamiento de datos XML.
-    """
-    xml_data = serializers.CharField()
-
-    def validate_xml_data(self, value):
-        # Procesamiento directo de la cadena XML
-        tree = ET.fromstring(value)
-        return ET.tostring(tree)
-
 class PIILeakageSerializer(serializers.Serializer):
     """
-    Serializer para exportación de datos de contacto.
+    VULNERABILIDAD: Fuga de Información Sensible - PII & Secretos Hardcoded (#5)
+    Expone datos personales y una API key hardcoded en la respuesta.
     """
     email = serializers.EmailField()
     phone = serializers.CharField()
     api_key_debug = serializers.SerializerMethodField()
 
     def get_api_key_debug(self, obj):
+        # VULNERABILIDAD: Clave API hardcoded expuesta en respuesta
         return "AKIA-DEBUG-INTERNAL-KEY-12345"
