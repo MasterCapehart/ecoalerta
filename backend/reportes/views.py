@@ -374,16 +374,22 @@ class ReporteViewSet(viewsets.ModelViewSet):
             reporte.save(update_fields=['direccion', 'direccion_completa'])
         else:
             # Geocodificación asíncrona
-            from .tasks import geocodificar_reporte_async
-            geocodificar_reporte_async.delay(reporte.id)
+            try:
+                from .tasks import geocodificar_reporte_async
+                geocodificar_reporte_async.delay(reporte.id)
+            except Exception:
+                pass
         
         # Calcular prioridad
         reporte.prioridad_calculada = PriorityService.calculate_priority_score(reporte)
         reporte.save(update_fields=['prioridad_calculada'])
         
         # Calcular SLA automáticamente (asíncrono)
-        from .tasks import calcular_sla_automatico
-        calcular_sla_automatico.delay(reporte.id)
+        try:
+            from .tasks import calcular_sla_automatico
+            calcular_sla_automatico.delay(reporte.id)
+        except Exception:
+            pass
         
         # Registrar en historial
         HistoryService.record_change(
@@ -1834,14 +1840,17 @@ def validar_reporte(request, reporte_id):
         
         # Notificar al ciudadano si tiene email
         if reporte.email and validado:
-            from .tasks import enviar_email_notificacion_async
-            asunto = f"Reporte validado: {reporte.codigo_seguimiento}"
-            mensaje = f"""
+            try:
+                from .tasks import enviar_email_notificacion_async
+                asunto = f"Reporte validado: {reporte.codigo_seguimiento}"
+                mensaje = f"""
             <h2>Reporte Validado</h2>
             <p>Tu reporte <strong>{reporte.codigo_seguimiento}</strong> ha sido validado y está siendo procesado.</p>
             <p>Gracias por tu colaboración.</p>
             """
-            enviar_email_notificacion_async.delay(reporte.email, asunto, mensaje)
+                enviar_email_notificacion_async.delay(reporte.email, asunto, mensaje)
+            except Exception:
+                pass
         
         logger.info(f"Reporte {reporte.codigo_seguimiento} {'validado' if validado else 'rechazado'} por {request.user.username}")
         
