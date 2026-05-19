@@ -28,3 +28,4 @@ geopy>=2.4.0
 requests>=2.31.0
 django-axes>=6.0.0
 django-simple-history>=3.5.0
+sqlalchemy>=2.0.0
