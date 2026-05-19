@@ -88,22 +88,33 @@ WSGI_APPLICATION = 'ecoalerta.wsgi.application'
 ASGI_APPLICATION = "ecoalerta.asgi.application"
 
 # Configuración de Channels (WebSockets)
-if DEBUG:
-    # En desarrollo local sin docker, usar memoria
+_redis_url = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')
+_use_redis_channels = not DEBUG and _redis_url not in ('none', 'None', '', 'false')
+
+if _use_redis_channels:
+    try:
+        import redis as _redis_test
+        _r = _redis_test.from_url(_redis_url)
+        _r.ping()
+        CHANNEL_LAYERS = {
+            "default": {
+                "BACKEND": "channels_redis.core.RedisChannelLayer",
+                "CONFIG": {
+                    "hosts": [_redis_url],
+                },
+            },
+        }
+    except Exception:
+        CHANNEL_LAYERS = {
+            "default": {
+                "BACKEND": "channels.layers.InMemoryChannelLayer"
+            }
+        }
+else:
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels.layers.InMemoryChannelLayer"
         }
-    }
-else:
-    # En producción o si se especifica Redis
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {
-                "hosts": [os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')],
-            },
-        },
     }
 
 
