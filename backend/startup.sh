@@ -27,4 +27,6 @@ for username, password in [('administrador','Admin1234!'),('inspector','Inspecto
 " || true
 
 echo "=== Starting Gunicorn from wwwroot ==="
+export PYTHONPATH=/home/site/wwwroot
+export PYTHONDONTWRITEBYTECODE=1
 exec gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers 2 --chdir /home/site/wwwroot ecoalerta.wsgi
