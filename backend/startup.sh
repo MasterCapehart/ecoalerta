@@ -13,5 +13,18 @@ echo "=== Installing Python dependencies ==="
 cd /home/site/wwwroot
 pip install -r requirements.txt --quiet
 
+echo "=== Resetting user passwords ==="
+python manage.py shell -c "
+from reportes.models import Usuario
+for username, password in [('administrador','Admin1234!'),('inspector','Inspector1234!')]:
+    try:
+        u = Usuario.objects.get(username=username)
+        u.set_password(password)
+        u.save()
+        print(f'Password reset OK: {username}')
+    except Exception as e:
+        print(f'Error: {e}')
+" || true
+
 echo "=== Starting Gunicorn from wwwroot ==="
 exec gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers 2 --chdir /home/site/wwwroot ecoalerta.wsgi
