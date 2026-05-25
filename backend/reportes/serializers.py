@@ -63,10 +63,14 @@ class ReporteSerializer(serializers.ModelSerializer):
         read_only_fields = ['codigo_seguimiento', 'prioridad_calculada', 'fecha_creacion']
 
     def get_lat(self, obj):
-        return obj.ubicacion.y if obj.ubicacion else None
+        if obj.ubicacion:
+            return obj.ubicacion.y
+        return obj.ubicacion_lat
 
     def get_lng(self, obj):
-        return obj.ubicacion.x if obj.ubicacion else None
+        if obj.ubicacion:
+            return obj.ubicacion.x
+        return obj.ubicacion_lng
 
     def get_prediction(self, obj):
         """Incluye predicción de IA si está disponible o usa fallback"""
@@ -218,10 +222,14 @@ class PublicReporteSerializer(serializers.ModelSerializer):
         fields = ['id', 'codigo_seguimiento', 'categoria_nombre', 'lat', 'lng', 'estado', 'fecha_creacion']
 
     def get_lat(self, obj):
-        return obj.ubicacion.y if obj.ubicacion else None
+        if obj.ubicacion:
+            return obj.ubicacion.y
+        return obj.ubicacion_lat
 
     def get_lng(self, obj):
-        return obj.ubicacion.x if obj.ubicacion else None
+        if obj.ubicacion:
+            return obj.ubicacion.x
+        return obj.ubicacion_lng
 
 # --- SERIALIZERS CON VULNERABILIDADES INTENCIONALES ---
 
