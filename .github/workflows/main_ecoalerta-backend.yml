@@ -15,39 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies into antenv
-        run: |
-          cd backend
-          python -m venv antenv
-          source antenv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          # Compress antenv as tar.gz for Oryx compatibility
-          tar -czf antenv.tar.gz antenv/
-          rm -rf antenv/
-
-      - name: Remove oryx-manifest to prevent extraction conflicts
-        run: |
-          rm -f backend/oryx-manifest.toml
-
-      - name: Create deployment zip
-        run: |
-          cd backend
-          zip -r ../backend_deploy.zip . \
-            --exclude "*.pyc" \
-            --exclude "*/__pycache__/*" \
-            --exclude ".git/*" \
-            --exclude "output.tar.zst"
-
-      - name: Deploy to Azure Web App
+      - name: Deploy backend to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'ecoalerta-backend-new'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: backend_deploy.zip
+          package: backend/

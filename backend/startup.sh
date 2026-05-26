@@ -9,29 +9,9 @@ export GEOS_LIBRARY_PATH=$(find /usr -name "libgeos_c.so*" | head -1)
 echo "GDAL: $GDAL_LIBRARY_PATH"
 echo "GEOS: $GEOS_LIBRARY_PATH"
 
-WWWROOT=/home/site/wwwroot
-
-# Encontrar python disponible
-if [ -f "/antenv/bin/python" ]; then
-    PYTHON=/antenv/bin/python
-    GUNICORN=/antenv/bin/gunicorn
-    echo "Using /antenv"
-elif [ -f "$WWWROOT/antenv/bin/python" ]; then
-    PYTHON=$WWWROOT/antenv/bin/python
-    GUNICORN=$WWWROOT/antenv/bin/gunicorn
-    echo "Using $WWWROOT/antenv"
-else
-    echo "Installing dependencies..."
-    pip install -r $WWWROOT/requirements.txt --quiet
-    PYTHON=python
-    GUNICORN=gunicorn
-fi
-
-echo "Python: $PYTHON"
-
 echo "=== Resetting user passwords ==="
-cd $WWWROOT
-$PYTHON manage.py shell -c "
+cd /home/site/wwwroot
+python manage.py shell -c "
 from reportes.models import Usuario
 for username, password in [('administrador','Admin1234!'),('inspector','Inspector1234!')]:
     try:
@@ -44,9 +24,4 @@ for username, password in [('administrador','Admin1234!'),('inspector','Inspecto
 " || true
 
 echo "=== Starting Gunicorn ==="
-exec $GUNICORN \
-  --bind=0.0.0.0:8000 \
-  --timeout 600 \
-  --workers 2 \
-  --chdir $WWWROOT \
-  ecoalerta.wsgi
+exec gunicorn --bind=0.0.0.0:8000 --timeout 600 --workers 2 ecoalerta.wsgi
