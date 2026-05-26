@@ -8,24 +8,33 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     permissions:
       contents: read
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create deployment zip from backend folder
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies into antenv
+        run: |
+          cd backend
+          python -m venv antenv
+          source antenv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create deployment zip
         run: |
           cd backend
           zip -r ../backend_deploy.zip . \
-            --exclude "__pycache__/*" \
-            --exclude "**/__pycache__/*" \
             --exclude "*.pyc" \
-            --exclude ".venv/*" \
-            --exclude "venv/*" \
-            --exclude "antenv/*" \
-            --exclude ".python_packages/*"
+            --exclude "*/__pycache__/*" \
+            --exclude ".git/*"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
