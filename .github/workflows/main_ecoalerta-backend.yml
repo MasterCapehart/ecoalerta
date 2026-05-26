@@ -27,6 +27,13 @@ jobs:
           source antenv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
+          # Compress antenv as tar.gz for Oryx compatibility
+          tar -czf antenv.tar.gz antenv/
+          rm -rf antenv/
+
+      - name: Remove oryx-manifest to prevent extraction conflicts
+        run: |
+          rm -f backend/oryx-manifest.toml
 
       - name: Create deployment zip
         run: |
@@ -34,7 +41,8 @@ jobs:
           zip -r ../backend_deploy.zip . \
             --exclude "*.pyc" \
             --exclude "*/__pycache__/*" \
-            --exclude ".git/*"
+            --exclude ".git/*" \
+            --exclude "output.tar.zst"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
