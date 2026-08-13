@@ -231,37 +231,3 @@ class PublicReporteSerializer(serializers.ModelSerializer):
             return obj.ubicacion.x
         return obj.ubicacion_lng
 
-# --- SERIALIZERS CON VULNERABILIDADES INTENCIONALES ---
-
-class VulnerableUserSerializer(serializers.ModelSerializer):
-    """
-    VULNERABILIDAD: IDOR con Exposición de Credenciales (#15) y
-    Fuga Masiva de Hashes de Contraseña (#21)
-    Expone password hash e is_superuser a cualquier usuario sin autorización.
-    """
-    class Meta:
-        model = Usuario
-        fields = ['id', 'username', 'email', 'password', 'is_superuser']
-
-class MassAssignmentSerializer(serializers.ModelSerializer):
-    """
-    VULNERABILIDAD: Asignación Masiva en Perfiles de Usuario (#6 / #18)
-    fields='__all__' permite modificar cualquier campo del modelo,
-    incluyendo is_staff, is_superuser, tipo, etc.
-    """
-    class Meta:
-        model = Usuario
-        fields = '__all__'
-
-class PIILeakageSerializer(serializers.Serializer):
-    """
-    VULNERABILIDAD: Fuga de Información Sensible - PII & Secretos Hardcoded (#5)
-    Expone datos personales y una API key hardcoded en la respuesta.
-    """
-    email = serializers.EmailField()
-    phone = serializers.CharField()
-    api_key_debug = serializers.SerializerMethodField()
-
-    def get_api_key_debug(self, obj):
-        # VULNERABILIDAD: Clave API hardcoded expuesta en respuesta
-        return "AKIA-DEBUG-INTERNAL-KEY-12345"

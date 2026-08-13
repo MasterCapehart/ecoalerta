@@ -63,7 +63,7 @@ MIDDLEWARE = [
     'simple_history.middleware.HistoryRequestMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'ecoalerta.middleware.SecurityLabMiddleware',
+    'ecoalerta.middleware.SecurityHeadersMiddleware',
 ]
 
 ROOT_URLCONF = 'ecoalerta.urls'
@@ -131,7 +131,7 @@ DATABASES = {
         'NAME': os.getenv('DB_NAME', 'postgres'),
         'USER': os.getenv('DB_USER', 'administrador'),
         'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST', 'ecoalerta.postgres.database.azure.com'),
+        'HOST': os.getenv('DB_HOST', 'urbanalert.postgres.database.azure.com'),
         'PORT': os.getenv('DB_PORT', '5432'),
         'OPTIONS': (
             {'sslmode': db_sslmode} if db_sslmode else {}
@@ -235,10 +235,10 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '10000/minute',  # General read API (deshabilitado temporalmente)
-        'user': '10000/minute',  # General read API (deshabilitado temporalmente)
-        'report_submission_anon': '10000/hour',   # Strict submission limit (deshabilitado temporalmente)
-        'report_submission_pro': '10000/hour',   # Auth submission limit (deshabilitado temporalmente)
+        'anon': '100/minute',
+        'user': '1000/minute',
+        'report_submission_anon': '10/hour',
+        'report_submission_pro': '100/hour',
     },
 }
 
@@ -331,8 +331,8 @@ SIMPLE_JWT = {
 
 # API Documentation (drf-spectacular)
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'EcoAlerta API',
-    'DESCRIPTION': 'API para gestión de reportes ambientales',
+    'TITLE': 'UrbanAlert API',
+    'DESCRIPTION': 'API para gestión de reportes ciudadanos urbanos',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
@@ -346,7 +346,7 @@ CACHES = {
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
         },
-        'KEY_PREFIX': 'ecoalerta',
+        'KEY_PREFIX': 'urbanalert',
         'TIMEOUT': 300,  # 5 minutos por defecto
     }
 }
@@ -427,7 +427,7 @@ EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@ecoalerta.cl')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@urbanalert.cl')
 
 # Configuración de Celery
 # Configuración de Celery
