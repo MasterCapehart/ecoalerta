@@ -37,9 +37,10 @@ class AssignmentService:
                 is_active=True
             )
         
+        total = reportes.count() if hasattr(reportes, 'count') else len(reportes)
         if not inspectores.exists():
             logger.warning("No hay inspectores disponibles para asignación")
-            return {'asignados': 0, 'detalles': []}
+            return {'asignados': 0, 'total_reportes': total, 'detalles': []}
         
         asignaciones = []
         
@@ -56,7 +57,7 @@ class AssignmentService:
                 logger.info(f"Reporte {reporte.codigo_seguimiento} asignado a {inspector.username}")
         
         logger.info(f"Asignados {len(asignaciones)} reportes automáticamente")
-        return {'asignados': len(asignaciones), 'detalles': asignaciones}
+        return {'asignados': len(asignaciones), 'total_reportes': total, 'detalles': asignaciones}
     
     @staticmethod
     def _find_best_inspector(reporte, inspectores):
@@ -163,10 +164,20 @@ class AssignmentService:
         ahora = timezone.now()
         ultimos_30_dias = ahora - timedelta(days=30)
         
+        promedio_horas = AssignmentService._get_average_resolution_time(inspector)
         stats = {
+            'total_asignados': Reporte.objects.filter(asignado_a=inspector).count(),
             'reportes_activos': Reporte.objects.filter(
                 asignado_a=inspector,
                 estado__in=['nuevo', 'proceso']
+            ).count(),
+            'resueltos': Reporte.objects.filter(
+                asignado_a=inspector,
+                estado='resuelto'
+            ).count(),
+            'en_proceso': Reporte.objects.filter(
+                asignado_a=inspector,
+                estado='proceso'
             ).count(),
             'reportes_resueltos_mes': Reporte.objects.filter(
                 asignado_a=inspector,
@@ -174,7 +185,8 @@ class AssignmentService:
                 fecha_actualizacion__gte=ultimos_30_dias
             ).count(),
             'carga_trabajo': AssignmentService._get_workload(inspector),
-            'promedio_resolucion_horas': AssignmentService._get_average_resolution_time(inspector),
+            'promedio_resolucion_horas': promedio_horas,
+            'tiempo_promedio_resolucion': promedio_horas,
         }
         
         return stats

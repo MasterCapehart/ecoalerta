@@ -19,7 +19,7 @@ class GeocodingService:
         """Obtiene instancia del geocoder (singleton)"""
         if cls._geocoder is None:
             try:
-                cls._geocoder = Nominatim(user_agent="ecoalerta")
+                cls._geocoder = Nominatim(user_agent="urbanalert")
             except Exception as e:
                 logger.error(f"Error al inicializar geocoder: {e}")
                 cls._geocoder = None

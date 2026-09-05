@@ -158,17 +158,17 @@ def generar_reporte_gerencial_cron():
             logger.warning("No hay administradores con email configurado para recibir el reporte gerencial.")
             return {'status': 'warning', 'message': 'Sin destinatarios'}
 
-        asunto = f"📊 Reporte Gerencial EcoAlerta - {ahora.strftime('%d/%m/%Y')}"
+        asunto = f"📊 Reporte Gerencial UrbanAlert - {ahora.strftime('%d/%m/%Y')}"
         mensaje = f"""
         Estimado equipo directivo,
 
-        Adjunto encontrará el Resumen Operativo de EcoAlerta correspondiente a la última semana ({fecha_desde.strftime('%d/%m/%Y')} - {ahora.strftime('%d/%m/%Y')}).
+        Adjunto encontrará el Resumen Operativo de UrbanAlert correspondiente a la última semana ({fecha_desde.strftime('%d/%m/%Y')} - {ahora.strftime('%d/%m/%Y')}).
 
         Total de reportes ingresados: {stats['totales']['total']}
         Tasa de resolución: {stats['tasa_resolucion']:.2f}%
 
         Atentamente,
-        Servicio Automatizado EcoAlerta
+        Servicio Automatizado UrbanAlert
         """
 
         email = EmailMessage(

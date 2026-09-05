@@ -1,16 +1,78 @@
 
 import React, { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, useMapEvents, ZoomControl } from 'react-leaflet'
-import { MapPin, Check, AlertTriangle, Trash2, Info, Upload, Lock } from 'lucide-react'
+import { MapPin, Check, AlertTriangle, Trash2, Info, Upload, Lock, ChevronLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useForm, Controller } from 'react-hook-form'
-import apiClient, { API_ROUTES } from '../services/api'
+import apiClient, { API_ROUTES, getCapasUrbanas, getSubcategoriasPorCapa, iaClasificarReporte } from '../services/api'
 import { toast } from './ToastContainer'
 import OfflineService from '../services/OfflineService'
 import AIService from '../services/AIService'
 import './ReporteForm.css'
+
+// Mapa de emojis por nombre de capa
+const CAPA_EMOJIS = {
+  'agua': '💧',
+  'vialidad': '🛣️',
+  'señalización': '🚦',
+  'señalizacion': '🚦',
+  'alumbrado': '💡',
+  'áreas verdes': '🌳',
+  'areas verdes': '🌳',
+  'infraestructura': '🔧',
+  'seguridad ciudadana': '🛡️',
+  'seguridad': '🛡️',
+  'emergencias': '🚨',
+  'edificación': '🏗️',
+  'edificacion': '🏗️',
+  'aseo': '🗑️',
+  'medio ambiente': '♻️',
+}
+
+// Mapa de colores por nombre de capa
+const CAPA_COLORES = {
+  'agua': '#3182ce',
+  'vialidad': '#d69e2e',
+  'señalización': '#dd6b20',
+  'señalizacion': '#dd6b20',
+  'alumbrado': '#ecc94b',
+  'áreas verdes': '#38a169',
+  'areas verdes': '#38a169',
+  'infraestructura': '#718096',
+  'seguridad ciudadana': '#553c9a',
+  'seguridad': '#553c9a',
+  'emergencias': '#e53e3e',
+  'edificación': '#744210',
+  'edificacion': '#744210',
+  'aseo': '#2d3748',
+  'medio ambiente': '#276749',
+}
+
+const getCapaEmoji = (nombre) => {
+  const key = nombre?.toLowerCase().trim()
+  return CAPA_EMOJIS[key] || '📋'
+}
+
+const getCapaColor = (nombre) => {
+  const key = nombre?.toLowerCase().trim()
+  return CAPA_COLORES[key] || '#4a5568'
+}
+
+// Capas de fallback si la API no responde
+const CAPAS_FALLBACK = [
+  { id: 1, nombre: 'Agua' },
+  { id: 2, nombre: 'Vialidad' },
+  { id: 3, nombre: 'Señalización' },
+  { id: 4, nombre: 'Alumbrado' },
+  { id: 5, nombre: 'Áreas Verdes' },
+  { id: 6, nombre: 'Infraestructura' },
+  { id: 7, nombre: 'Seguridad Ciudadana' },
+  { id: 8, nombre: 'Emergencias' },
+  { id: 9, nombre: 'Aseo' },
+  { id: 10, nombre: 'Medio Ambiente' },
+]
 
 // Custom Icon for Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -34,6 +96,7 @@ const ReporteForm = () => {
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm({
     defaultValues: {
       categoria: '',
+      subcategoria: '',
       ubicacion: null,
       direccion: '',
       fotos: [],
@@ -58,8 +121,20 @@ const ReporteForm = () => {
   })
   const [confirmDuplicate, setConfirmDuplicate] = useState(false)
 
+  // Estado para el flujo de selección capa → subcategoría
+  const [capas, setCapas] = useState([])
+  const [capaSeleccionada, setCapaSeleccionada] = useState(null)
+  const [subcategorias, setSubcategorias] = useState([])
+  const [subcategoriaSeleccionada, setSubcategoriaSeleccionada] = useState(null)
+  const [loadingSubcategorias, setLoadingSubcategorias] = useState(false)
+
   // Mantenemos previews separado porque no se envía al backend, es solo visual
   const [fotoPreviews, setFotoPreviews] = useState([])
+
+  // Estados IA — clasificación por descripción
+  const [iaClasificando, setIaClasificando] = useState(false)
+  const [iaSugerencia, setIaSugerencia] = useState(null)
+  const [iaDuplicado, setIaDuplicado] = useState(null)
 
   // Watch values for conditional rendering/logic
   const ubicacion = watch('ubicacion')
@@ -112,7 +187,20 @@ const ReporteForm = () => {
         ])
       }
     }
+
+    const fetchCapas = async () => {
+      try {
+        const response = await getCapasUrbanas()
+        const data = response.data
+        const lista = Array.isArray(data) ? data : (data.results || [])
+        setCapas(lista.length > 0 ? lista : CAPAS_FALLBACK)
+      } catch {
+        setCapas(CAPAS_FALLBACK)
+      }
+    }
+
     fetchCategorias()
+    fetchCapas()
 
     // Geolocate on load
     if (navigator.geolocation) {
@@ -125,6 +213,60 @@ const ReporteForm = () => {
       )
     }
   }, [])
+
+  const handleSeleccionarCapa = async (capa) => {
+    setCapaSeleccionada(capa)
+    setSubcategoriaSeleccionada(null)
+    setSubcategorias([])
+    setValue('subcategoria', '', { shouldValidate: false })
+    setValue('categoria', '', { shouldValidate: false })
+    setLoadingSubcategorias(true)
+    try {
+      const response = await getSubcategoriasPorCapa(capa.id)
+      const data = response.data
+      setSubcategorias(Array.isArray(data) ? data : (data.results || []))
+    } catch {
+      // Si la API no devuelve subcategorías, usar la capa como categoría directa
+      setSubcategorias([])
+      setValue('categoria', capa.id, { shouldValidate: true })
+    } finally {
+      setLoadingSubcategorias(false)
+    }
+  }
+
+  const handleSeleccionarSubcategoria = (sub) => {
+    setSubcategoriaSeleccionada(sub)
+    // Mantener compatibilidad: categoria = id de la subcategoría (o capa si no hay sub)
+    setValue('subcategoria', sub.id, { shouldValidate: true })
+    setValue('categoria', sub.categoria || capaSeleccionada?.id, { shouldValidate: true })
+  }
+
+  const handleVolverACapas = () => {
+    setCapaSeleccionada(null)
+    setSubcategorias([])
+    setSubcategoriaSeleccionada(null)
+    setValue('subcategoria', '', { shouldValidate: false })
+    setValue('categoria', '', { shouldValidate: false })
+  }
+
+  const handleDescripcionIA = async (texto) => {
+    if (texto.length < 15) return // Esperar mínimo 15 chars
+    clearTimeout(window._iaTimer)
+    window._iaTimer = setTimeout(async () => {
+      setIaClasificando(true)
+      setIaSugerencia(null)
+      try {
+        const res = await iaClasificarReporte(texto)
+        if (res.data && res.data.capa) {
+          setIaSugerencia(res.data)
+        }
+      } catch (e) {
+        // silencioso - IA es opcional
+      } finally {
+        setIaClasificando(false)
+      }
+    }, 1000) // debounce 1 segundo
+  }
 
   const MapClickHandler = () => {
     useMapEvents({
@@ -243,6 +385,7 @@ const ReporteForm = () => {
     try {
       const formData = new FormData()
       formData.append('categoria', data.categoria)
+      if (data.subcategoria) formData.append('subcategoria', data.subcategoria)
       formData.append('lat', data.ubicacion.lat)
       formData.append('lng', data.ubicacion.lng)
       if (data.descripcion) formData.append('descripcion', data.descripcion)
@@ -308,7 +451,13 @@ const ReporteForm = () => {
     setAiSuggestion(null)
     setShowSuccessModal(false)
     setCodigoSeguimiento(null)
+    setCapaSeleccionada(null)
+    setSubcategorias([])
+    setSubcategoriaSeleccionada(null)
   }
+
+  // Extraer onChange de register para descripcion (evita sobreescritura con spread)
+  const { onChange: onDescripcionChange, ...descripcionRegisterProps } = register('descripcion')
 
   return (
     <div className="report-page">
@@ -483,7 +632,7 @@ const ReporteForm = () => {
                 className="ai-suggestion-chip"
                 onClick={() => {
                   setValue('categoria', aiSuggestion.categoryId, { shouldValidate: true })
-                  setAiSuggestion(null) // Clear after selection
+                  setAiSuggestion(null)
                   toast.success('Categoría aplicada automáticamente')
                 }}
                 style={{
@@ -520,17 +669,109 @@ const ReporteForm = () => {
             )}
 
             <div className="form-group">
-              <label className="form-label">Tipo de residuos *</label>
-              <select
-                className={`form-control ${errors.categoria ? 'is-invalid' : ''}`}
-                {...register('categoria', { required: 'La categoría es obligatoria' })}
-              >
-                <option value="">Seleccione una opción</option>
-                {categorias.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                ))}
-              </select>
-              {errors.categoria && <span className="error-text">{errors.categoria.message}</span>}
+              <label className="form-label">Categoría del problema *</label>
+
+              {/* Paso 1: Selector visual de Capa Urbana */}
+              {!capaSeleccionada && (
+                <>
+                  <div className="step-label">Paso 1 — Selecciona un área</div>
+                  <div className="capa-selector">
+                    {capas.map(capa => {
+                      const color = getCapaColor(capa.nombre)
+                      return (
+                        <button
+                          key={capa.id}
+                          type="button"
+                          className="capa-card"
+                          style={{ '--capa-color': color }}
+                          onClick={() => handleSeleccionarCapa(capa)}
+                        >
+                          <div className="capa-icon">{getCapaEmoji(capa.nombre)}</div>
+                          <div className="capa-nombre">{capa.nombre}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {errors.categoria && (
+                    <span className="error-text">Debes seleccionar una categoría</span>
+                  )}
+                </>
+              )}
+
+              {/* Paso 2: Selector de Subcategoría */}
+              {capaSeleccionada && (
+                <>
+                  <button
+                    type="button"
+                    className="capa-back-btn"
+                    onClick={handleVolverACapas}
+                  >
+                    <ChevronLeft size={14} /> Volver a áreas
+                  </button>
+
+                  <div
+                    className="capa-card selected"
+                    style={{
+                      '--capa-color': getCapaColor(capaSeleccionada.nombre),
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      marginBottom: 12,
+                      cursor: 'default',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <span style={{ fontSize: 22 }}>{getCapaEmoji(capaSeleccionada.nombre)}</span>
+                    <strong className="capa-nombre" style={{ fontSize: 14 }}>{capaSeleccionada.nombre}</strong>
+                  </div>
+
+                  {loadingSubcategorias ? (
+                    <div className="helper-text">Cargando subcategorías...</div>
+                  ) : subcategorias.length > 0 ? (
+                    <>
+                      <div className="step-label">Paso 2 — Tipo específico</div>
+                      <div className="subcategoria-selector">
+                        {subcategorias.map(sub => {
+                          const prioridadKey = (sub.prioridad || 'normal').toLowerCase()
+                          const slaHoras = sub.sla_horas || sub.tiempo_respuesta_horas
+                          return (
+                            <div
+                              key={sub.id}
+                              className={`subcategoria-item ${subcategoriaSeleccionada?.id === sub.id ? 'selected' : ''}`}
+                              onClick={() => handleSeleccionarSubcategoria(sub)}
+                            >
+                              <div>
+                                <div className="subcategoria-nombre">{sub.nombre}</div>
+                                <div className="subcategoria-badges">
+                                  {slaHoras && (
+                                    <span className="sla-badge">
+                                      ⏱ Respuesta: {slaHoras}h
+                                    </span>
+                                  )}
+                                  <span className={`prioridad-badge ${prioridadKey}`}>
+                                    {sub.prioridad || 'Normal'}
+                                  </span>
+                                </div>
+                              </div>
+                              {subcategoriaSeleccionada?.id === sub.id && (
+                                <Check size={16} color="#4299e1" />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {errors.subcategoria && (
+                        <span className="error-text">Debes seleccionar un tipo específico</span>
+                      )}
+                    </>
+                  ) : (
+                    // Sin subcategorías: la capa funciona directamente como categoría
+                    <div className="helper-text" style={{ color: '#38a169' }}>
+                      <Check size={13} /> Área seleccionada correctamente
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             <div className="form-group">
@@ -558,8 +799,51 @@ const ReporteForm = () => {
               <textarea
                 className="form-control"
                 placeholder="Describe el vertedero (tamaño, tiempo, etc.)"
-                {...register('descripcion')}
+                {...descripcionRegisterProps}
+                onChange={(e) => {
+                  onDescripcionChange(e)
+                  handleDescripcionIA(e.target.value)
+                }}
               />
+
+              {/* Sugerencia IA */}
+              {iaClasificando && (
+                <div className="ia-clasificando">
+                  <span className="ia-spinner">🤖</span> Analizando con IA...
+                </div>
+              )}
+              {iaSugerencia && !iaClasificando && (
+                <div className="ia-sugerencia">
+                  <div className="ia-sugerencia-header">
+                    <span>🤖 IA sugiere:</span>
+                    <span className="ia-confianza">{Math.round(iaSugerencia.confianza * 100)}% confianza</span>
+                  </div>
+                  <div className="ia-sugerencia-body">
+                    <strong>{iaSugerencia.capa}</strong> → {iaSugerencia.subcategoria}
+                    <span className={`ia-prioridad ia-prioridad-${iaSugerencia.prioridad}`}>
+                      {iaSugerencia.prioridad}
+                    </span>
+                  </div>
+                  <div className="ia-sugerencia-razon">{iaSugerencia.razon}</div>
+                  <button
+                    type="button"
+                    className="ia-aplicar-btn"
+                    onClick={() => {
+                      const capaEncontrada = capas.find(c => c.id === iaSugerencia.capa_id)
+                      if (capaEncontrada) {
+                        handleSeleccionarCapa(capaEncontrada)
+                        setTimeout(() => {
+                          const sub = { id: iaSugerencia.subcategoria_id, nombre: iaSugerencia.subcategoria, prioridad_base: iaSugerencia.prioridad }
+                          handleSeleccionarSubcategoria(sub)
+                        }, 100)
+                      }
+                      setIaSugerencia(null)
+                    }}
+                  >
+                    ✓ Aplicar sugerencia
+                  </button>
+                </div>
+              )}
             </div>
 
             <button

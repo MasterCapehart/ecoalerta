@@ -40,16 +40,99 @@ class Usuario(AbstractUser):
 
 
 class CategoriaResiduo(models.Model):
-    """Categorías de residuos reportados"""
+    """Categorías de residuos reportados (legacy - usar SubcategoriaUrbana)"""
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True)
-    
+
     def __str__(self):
         return self.nombre
-    
+
     class Meta:
         verbose_name = 'Categoría de Residuo'
         verbose_name_plural = 'Categorías de Residuos'
+
+
+class DepartamentoMunicipal(models.Model):
+    """Departamento municipal responsable de atender una capa urbana"""
+    nombre = models.CharField(max_length=150)
+    descripcion = models.TextField(blank=True)
+    email_contacto = models.EmailField(blank=True)
+    telefono = models.CharField(max_length=30, blank=True)
+    activo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = 'Departamento Municipal'
+        verbose_name_plural = 'Departamentos Municipales'
+        ordering = ['nombre']
+
+
+class CapaUrbana(models.Model):
+    """
+    Capa temática del mapa (ej: Vialidad, Alumbrado, Medio Ambiente).
+    Cada capa tiene un color y un departamento municipal responsable.
+    """
+    nombre = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+    descripcion = models.TextField(blank=True)
+    icono = models.CharField(max_length=50, default='map')        # Nombre de ícono (SF Symbol / Material)
+    color_hex = models.CharField(max_length=7, default='#3498db') # Color en el mapa
+    departamento = models.ForeignKey(
+        DepartamentoMunicipal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='capas'
+    )
+    activa = models.BooleanField(default=True)
+    orden = models.IntegerField(default=0)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = 'Capa Urbana'
+        verbose_name_plural = 'Capas Urbanas'
+        ordering = ['orden', 'nombre']
+
+
+class SubcategoriaUrbana(models.Model):
+    """
+    Subcategoría específica dentro de una capa urbana.
+    Ej: dentro de 'Vialidad' → 'Bache en calzada', 'Vereda dañada', etc.
+    """
+    capa = models.ForeignKey(
+        CapaUrbana,
+        on_delete=models.CASCADE,
+        related_name='subcategorias'
+    )
+    nombre = models.CharField(max_length=100)
+    descripcion = models.TextField(blank=True)
+    icono = models.CharField(max_length=50, blank=True)
+    sla_horas = models.IntegerField(default=72)  # Plazo de resolución en horas
+    PRIORIDAD_CHOICES = [
+        ('baja', 'Baja'),
+        ('normal', 'Normal'),
+        ('alta', 'Alta'),
+        ('urgente', 'Urgente'),
+    ]
+    prioridad_base = models.CharField(
+        max_length=20,
+        choices=PRIORIDAD_CHOICES,
+        default='normal'
+    )
+    activa = models.BooleanField(default=True)
+    orden = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f'{self.capa.nombre} → {self.nombre}'
+
+    class Meta:
+        verbose_name = 'Subcategoría Urbana'
+        verbose_name_plural = 'Subcategorías Urbanas'
+        ordering = ['capa__orden', 'orden', 'nombre']
 
 
 class Reporte(models.Model):
@@ -70,9 +153,18 @@ class Reporte(models.Model):
     
     # Información básica
     categoria = models.ForeignKey(
-        CategoriaResiduo, 
-        on_delete=models.SET_NULL, 
+        CategoriaResiduo,
+        on_delete=models.SET_NULL,
         null=True,
+        blank=True,
+        related_name='reportes'
+    )
+    # Nueva capa urbana multi-categoría (reemplaza gradualmente a 'categoria')
+    subcategoria = models.ForeignKey(
+        'SubcategoriaUrbana',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='reportes'
     )
     descripcion = models.TextField(blank=True)
@@ -92,9 +184,21 @@ class Reporte(models.Model):
     def ubicacion_lat(self):
         return self.ubicacion.y if self.ubicacion else None
         
+    @ubicacion_lat.setter
+    def ubicacion_lat(self, value):
+        if value is not None:
+            lng = self.ubicacion.x if self.ubicacion else 0.0
+            self.ubicacion = Point(float(lng), float(value), srid=4326)
+
     @property
     def ubicacion_lng(self):
         return self.ubicacion.x if self.ubicacion else None
+
+    @ubicacion_lng.setter
+    def ubicacion_lng(self, value):
+        if value is not None:
+            lat = self.ubicacion.y if self.ubicacion else 0.0
+            self.ubicacion = Point(float(value), float(lat), srid=4326)
     direccion = models.CharField(max_length=255, blank=True)
     
     # (Propiedades eliminadas ya que 'ubicacion' ahora es un campo real)
@@ -365,3 +469,61 @@ class BusquedaGuardada(models.Model):
         verbose_name = 'Búsqueda Guardada'
         verbose_name_plural = 'Búsquedas Guardadas'
         ordering = ['-fecha_ultimo_uso']
+
+
+class ConfiguracionMunicipio(models.Model):
+    """
+    Configuración dinámica del municipio.
+    Permite adaptar EcoAlerta a cualquier municipio de Chile sin tocar código.
+    Solo debe existir UN registro (singleton).
+    """
+    nombre = models.CharField(max_length=150, default='Mi Municipio')
+    region = models.CharField(max_length=100, blank=True, default='')
+    pais = models.CharField(max_length=60, default='Chile')
+
+    # Mapa
+    mapa_lat = models.FloatField(default=-29.9027)
+    mapa_lng = models.FloatField(default=-71.2520)
+    mapa_zoom = models.IntegerField(default=13)
+
+    # Límites geográficos (para restringir reportes dentro del área)
+    bounds_norte = models.FloatField(null=True, blank=True)
+    bounds_sur = models.FloatField(null=True, blank=True)
+    bounds_este = models.FloatField(null=True, blank=True)
+    bounds_oeste = models.FloatField(null=True, blank=True)
+
+    # Branding
+    logo_url = models.URLField(blank=True, default='')
+    color_primario = models.CharField(max_length=7, default='#1a6b3c')
+    color_secundario = models.CharField(max_length=7, default='#2d9e5f')
+
+    # Contacto
+    email_contacto = models.EmailField(blank=True, default='')
+    telefono_contacto = models.CharField(max_length=30, blank=True, default='')
+    sitio_web = models.URLField(blank=True, default='')
+    direccion_municipio = models.CharField(max_length=200, blank=True, default='')
+
+    # Textos personalizables
+    slogan = models.CharField(max_length=200, blank=True, default='Sistema de Reportes Ciudadanos Urbanos')
+
+    # Metadatos
+    activo = models.BooleanField(default=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'Configuración: {self.nombre}'
+
+    def save(self, *args, **kwargs):
+        # Singleton: solo permite un registro
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_config(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    class Meta:
+        verbose_name = 'Configuración del Municipio'
+        verbose_name_plural = 'Configuración del Municipio'
+

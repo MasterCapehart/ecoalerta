@@ -5,7 +5,7 @@ import { API_URL } from '../config'
 // Crear instancia de axios
 const apiClient = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -112,6 +112,29 @@ export const API_ROUTES = {
   ANALYTICS_EJECUTIVO: '/api/analytics/ejecutivo/',
   MIS_REPORTES: '/api/reportes/mis_reportes/',
 }
+
+// Capas urbanas y subcategorías
+export const getCapasUrbanas = () => apiClient.get('/api/capas/')
+export const getDepartamentos = () => apiClient.get('/api/departamentos/')
+export const getSubcategoriasPorCapa = (capaId) => apiClient.get(`/api/capas/${capaId}/subcategorias/`)
+
+// IA: endpoints con timeout extendido (Ollama puede tardar 60-120s)
+const IA_TIMEOUT = 120000
+
+export const iaClasificarReporte = (descripcion) =>
+  apiClient.post('/api/ia/clasificar/', { descripcion }, { timeout: IA_TIMEOUT })
+
+export const iaDetectarDuplicado = (descripcion, lat, lng) =>
+  apiClient.post('/api/ia/duplicado/', { descripcion, lat, lng }, { timeout: IA_TIMEOUT })
+
+export const iaChatAdmin = (pregunta) =>
+  apiClient.post('/api/ia/chat-admin/', { pregunta }, { timeout: IA_TIMEOUT })
+
+export const iaResumenDepartamento = (departamento_id) =>
+  apiClient.post('/api/ia/resumen-departamento/', { departamento_id }, { timeout: IA_TIMEOUT })
+
+export const iaRespuestaCiudadano = (reporte_id, notas_cierre) =>
+  apiClient.post('/api/ia/respuesta-ciudadano/', { reporte_id, notas_cierre }, { timeout: IA_TIMEOUT })
 
 export default apiClient
 

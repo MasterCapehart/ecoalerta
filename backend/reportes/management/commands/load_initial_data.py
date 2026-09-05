@@ -13,12 +13,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         # Crear categorías de residuos
         categorias = [
-            {'nombre': 'Residuos Domésticos', 'descripcion': 'Basura doméstica común'},
-            {'nombre': 'Escombros de Construcción', 'descripcion': 'Materiales de construcción'},
-            {'nombre': 'Residuos Electrónicos', 'descripcion': 'Equipos electrónicos desechados'},
-            {'nombre': 'Residuos Orgánicos', 'descripcion': 'Desechos orgánicos biodegradables'},
-            {'nombre': 'Residuos Peligrosos', 'descripcion': 'Materiales tóxicos o peligrosos'},
-            {'nombre': 'Mixtos', 'descripcion': 'Mezcla de diferentes tipos de residuos'},
+            {'nombre': 'Baches y Pavimento', 'descripcion': 'Hoyos, grietas o hundimientos en calles y veredas'},
+            {'nombre': 'Iluminación', 'descripcion': 'Faroles apagados, cables caídos o postes dañados'},
+            {'nombre': 'Residuos y Basurales', 'descripcion': 'Microbasurales, escombros o acumulación de basura'},
+            {'nombre': 'Áreas Verdes', 'descripcion': 'Plazas descuidadas, poda pendiente o árboles peligrosos'},
+            {'nombre': 'Semáforos y Señalética', 'descripcion': 'Semáforos sin luz, señales dañadas o faltantes'},
+            {'nombre': 'Infraestructura', 'descripcion': 'Veredas rotas, tapas de alcantarilla, bancas dañadas'},
+            {'nombre': 'Seguridad Vial', 'descripcion': 'Rayados, daños en mobiliario urbano o riesgo vial'},
+            {'nombre': 'Otro', 'descripcion': 'Otros problemas urbanos no categorizados'},
         ]
 
         for cat_data in categorias:
@@ -41,7 +43,7 @@ class Command(BaseCommand):
             defaults={
                 'password': '1234',
                 'tipo': 'admin',
-                'email': 'inspector@ecoalerta.cl'
+                'email': 'inspector@urbanalert.cl'
             }
         )
         
@@ -70,7 +72,7 @@ class Command(BaseCommand):
             defaults={
                 'password': '1234',
                 'tipo': 'admin',
-                'email': 'administrador@ecoalerta.cl',
+                'email': 'administrador@urbanalert.cl',
                 'is_staff': True,
                 'is_superuser': True
             }

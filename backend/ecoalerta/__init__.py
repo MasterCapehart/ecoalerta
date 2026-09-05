@@ -1,4 +1,4 @@
-# EcoAlerta Backend
+# UrbanAlert Backend
 # NO importar nada relacionado con GeoDjango aquí
 
 # Importar Celery cuando Django esté listo

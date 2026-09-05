@@ -110,20 +110,12 @@ class SearchService:
     @staticmethod
     def _filter_by_proximity(queryset, lat, lng, radio_km):
         """
-        Filtra reportes por proximidad usando la fórmula de Haversine
+        Filtra reportes por proximidad usando GeoDjango dwithin
         """
-        import math
-        lat_delta = radio_km / 111.0
-        lng_delta = radio_km / (111.0 * abs(math.cos(math.radians(lat))))
-
-        queryset = queryset.filter(
-            ubicacion_lat__gte=lat - lat_delta,
-            ubicacion_lat__lte=lat + lat_delta,
-            ubicacion_lng__gte=lng - lng_delta,
-            ubicacion_lng__lte=lng + lng_delta
-        )
-
-        return queryset
+        from django.contrib.gis.geos import Point
+        point = Point(float(lng), float(lat), srid=4326)
+        degree_distance = float(radio_km) / 111.0
+        return queryset.filter(ubicacion__dwithin=(point, degree_distance))
 
     @staticmethod
     def calculate_distance(lat1, lng1, lat2, lng2):

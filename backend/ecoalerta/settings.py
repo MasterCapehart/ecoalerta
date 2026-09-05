@@ -174,13 +174,17 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # Axes Configuration
-AXES_FAILURE_LIMIT = 5
-AXES_COOLOFF_TIME = 1  # horas
-AXES_LOCKOUT_TEMPLATE = None # Usar JSON para API
+AXES_FAILURE_LIMIT = 10           # 10 intentos antes de bloquear
+AXES_COOLOFF_TIME = 0.5           # 30 minutos de bloqueo
+AXES_LOCKOUT_TEMPLATE = None      # Respuesta JSON para API REST
 AXES_LOCKOUT_URL = None
-AXES_RESET_ON_SUCCESS = True
+AXES_RESET_ON_SUCCESS = True      # Limpiar intentos al loguearse bien
 AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
 AXES_HANDLER = 'axes.handlers.database.AxesDatabaseHandler'
+AXES_VERBOSE = False              # No spam en logs
+AXES_ENABLE_ADMIN = True          # Panel admin para gestionar bloqueos
+AXES_HTTP_RESPONSE_CODE = 429     # 429 Too Many Requests (estándar REST)
+AXES_LOCKOUT_CALLABLE = 'reportes.views.axes_lockout_response'  # Respuesta personalizada JSON
 
 
 
@@ -453,6 +457,12 @@ CELERY_TASK_ACKS_LATE = True
 # Configuración de Celery Beat (tareas programadas)
 from reportes.celerybeat_schedule import CELERY_BEAT_SCHEDULE
 CELERY_BEAT_SCHEDULE = CELERY_BEAT_SCHEDULE
+
+# Timeout extendido para Daphne — necesario para respuestas lentas de Ollama IA
+DAPHNE = {
+    'http_timeout': 300,       # 5 minutos para requests HTTP
+    'application_close_timeout': 300,
+}
 
 # Validación de variables de entorno críticas en producción
 if not DEBUG:

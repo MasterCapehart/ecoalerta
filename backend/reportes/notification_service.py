@@ -25,7 +25,7 @@ class NotificationService:
             send_mail(
                 subject=asunto,
                 message=mensaje_texto,
-                from_email=settings.DEFAULT_FROM_EMAIL if hasattr(settings, 'DEFAULT_FROM_EMAIL') else 'noreply@ecoalerta.cl',
+                from_email=settings.DEFAULT_FROM_EMAIL if hasattr(settings, 'DEFAULT_FROM_EMAIL') else 'noreply@urbanalert.cl',
                 recipient_list=[destinatario],
                 html_message=mensaje_html,
                 fail_silently=False,

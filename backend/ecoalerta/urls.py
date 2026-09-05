@@ -13,7 +13,7 @@ def root_view(request):
     """Vista raíz para evitar bucles de redirección"""
     # Devolver respuesta directa sin redirecciones
     response = JsonResponse({
-        'message': 'EcoAlerta API',
+        'message': 'UrbanAlert API',
         'version': '1.0',
         'status': 'ok',
         'endpoints': {

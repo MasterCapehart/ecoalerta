@@ -4,8 +4,10 @@ import Login from './components/Login'
 import ReporteForm from './components/ReporteForm'
 import DashboardMunicipal from './components/DashboardMunicipal'
 import DashboardAdmin from './components/DashboardAdmin'
+import DepartamentoPanel from './components/DepartamentoPanel'
 import PublicTracking from './components/PublicTracking'
 import PublicDashboard from './components/PublicDashboard'
+import PanelCiudadano from './components/PanelCiudadano'
 import ToastContainer from './components/ToastContainer'
 import { toast } from './components/ToastContainer'
 import { WebSocketProvider } from './context/WebSocketContext'
@@ -67,9 +69,12 @@ function App() {
           <Route path="/reporte" element={<ReporteForm />} />
           <Route path="/dashboard" element={<DashboardMunicipal />} />
           <Route path="/admin" element={<DashboardAdmin />} />
+          <Route path="/departamento" element={<DepartamentoPanel />} />
+          <Route path="/departamento/:id" element={<DepartamentoPanel />} />
           <Route path="/seguimiento/:codigo" element={<PublicTracking />} />
           <Route path="/seguimiento" element={<PublicTracking />} />
           <Route path="/public-dashboard" element={<PublicDashboard />} />
+          <Route path="/ciudadano" element={<PanelCiudadano />} />
         </Routes>
       </WebSocketProvider>
     </BrowserRouter>

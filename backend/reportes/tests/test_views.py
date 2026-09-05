@@ -49,6 +49,7 @@ class ReporteViewSetTests(TestCase):
             'descripcion': 'Nuevo reporte',
             'lat': -33.45,
             'lng': -70.66,
+            'permitir_duplicado': 'true',
         }
         response = self.client.post('/api/reportes/', data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

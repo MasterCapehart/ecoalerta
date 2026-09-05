@@ -7,6 +7,7 @@ import './DashboardMunicipal.css'
 import { API_ROUTES } from '../config'
 import { API_URL } from '../config'
 import apiClient from '../services/api'
+import { iaRespuestaCiudadano, iaChatAdmin } from '../services/api'
 import { fetchCategorias as fetchCategoriasService } from '../services/predictions'
 import { toast } from './ToastContainer'
 import OfflineService from '../services/OfflineService'
@@ -423,6 +424,131 @@ const BrainIconSVG = ({ size = 20 }) => (
 )
 
 
+// ── Chat IA para Administrador ────────────────────────────────────────────────
+function ChatIAAdmin() {
+  const [mensajes, setMensajes] = useState([{
+    tipo: 'ia',
+    texto: '👋 Hola, soy tu asistente de análisis municipal. Consulto la base de datos en tiempo real.\n\nEjemplos:\n• ¿Cuántos reportes hubo por departamento en los últimos 6 meses?\n• ¿Cuál es el tiempo promedio de resolución por categoría?\n• ¿Cuántos reportes urgentes hay activos ahora?\n• ¿Qué inspector tiene más reportes asignados?',
+    timestamp: new Date()
+  }])
+  const [pregunta, setPregunta] = useState('')
+  const [cargando, setCargando] = useState(false)
+  const endRef = useRef(null)
+
+  const PREGUNTAS_RAPIDAS = [
+    '¿Cuántos reportes hay por estado?',
+    '¿Reportes por departamento últimos 6 meses?',
+    '¿Cuántos reportes urgentes activos?',
+    '¿Tiempo promedio de resolución?',
+  ]
+
+  const enviar = async () => {
+    const q = pregunta.trim()
+    if (!q || cargando) return
+    setMensajes(prev => [...prev, { tipo: 'usuario', texto: q, timestamp: new Date() }])
+    setPregunta('')
+    setCargando(true)
+    try {
+      const res = await iaChatAdmin(q)
+      setMensajes(prev => [...prev, { tipo: 'ia', texto: res.data.respuesta, sql: res.data.sql, datos: res.data.datos, timestamp: new Date() }])
+    } catch {
+      setMensajes(prev => [...prev, { tipo: 'error', texto: '❌ No se pudo conectar con la IA. Verifica que Ollama esté corriendo.', timestamp: new Date() }])
+    } finally {
+      setCargando(false)
+      setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    }
+  }
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',flex:1,overflow:'hidden',margin:'16px',gap:'0',borderRadius:'12px',border:'1px solid #e2e8f0',background:'white',boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
+      {/* Mensajes */}
+      <div style={{flex:1,overflowY:'auto',padding:'20px',display:'flex',flexDirection:'column',gap:'16px',background:'#f8fafc'}}>
+        {mensajes.map((m, i) => (
+          <div key={i} style={{display:'flex',gap:'10px',flexDirection: m.tipo==='usuario' ? 'row-reverse' : 'row',alignItems:'flex-start'}}>
+            <div style={{width:'30px',height:'30px',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,background: m.tipo==='usuario' ? '#2563eb' : '#dbeafe',color: m.tipo==='usuario' ? 'white' : '#2563eb',fontSize: m.tipo==='usuario' ? '10px' : '16px',fontWeight:'700'}}>
+              {m.tipo==='usuario' ? 'Tú' : '🤖'}
+            </div>
+            <div style={{maxWidth:'80%'}}>
+              <div style={{background: m.tipo==='usuario' ? '#2563eb' : m.tipo==='error' ? '#fee2e2' : 'white',color: m.tipo==='usuario' ? 'white' : '#374151',border: m.tipo==='ia' ? '1px solid #e2e8f0' : 'none',borderRadius: m.tipo==='usuario' ? '12px 0 12px 12px' : '0 12px 12px 12px',padding:'12px 16px',fontSize:'14px',lineHeight:'1.6',whiteSpace:'pre-wrap',boxShadow: m.tipo==='ia' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'}}>
+                {m.texto}
+              </div>
+              {/* Tabla de datos */}
+              {m.datos && m.datos.total > 0 && (
+                <div style={{marginTop:'10px',border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}}>
+                  <div style={{padding:'8px 12px',background:'#f1f5f9',fontSize:'12px',color:'#64748b',fontWeight:'600'}}>
+                    📊 {m.datos.total} registros encontrados
+                  </div>
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
+                      <thead>
+                        <tr>{m.datos.columnas.map(c => <th key={c} style={{padding:'8px 12px',background:'#f8fafc',color:'#64748b',textAlign:'left',fontWeight:'600',borderBottom:'1px solid #e2e8f0'}}>{c}</th>)}</tr>
+                      </thead>
+                      <tbody>
+                        {m.datos.filas.slice(0,8).map((fila,fi) => (
+                          <tr key={fi} style={{borderBottom:'1px solid #f1f5f9'}}>
+                            {fila.map((cel,ci) => <td key={ci} style={{padding:'7px 12px',color:'#374151'}}>{String(cel ?? '—')}</td>)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {m.datos.total > 8 && <div style={{padding:'8px 12px',fontSize:'12px',color:'#94a3b8',textAlign:'center',background:'#f8fafc'}}>+ {m.datos.total - 8} registros más</div>}
+                </div>
+              )}
+              {/* SQL */}
+              {m.sql && (
+                <details style={{marginTop:'8px',fontSize:'12px'}}>
+                  <summary style={{cursor:'pointer',color:'#64748b',padding:'4px 0'}}>Ver SQL ejecutado</summary>
+                  <code style={{display:'block',background:'#1e293b',color:'#e2e8f0',padding:'10px',borderRadius:'6px',fontFamily:'monospace',fontSize:'11px',marginTop:'6px',whiteSpace:'pre-wrap',wordBreak:'break-all'}}>{m.sql}</code>
+                </details>
+              )}
+              <div style={{fontSize:'11px',color: m.tipo==='usuario' ? 'rgba(255,255,255,0.6)' : '#94a3b8',marginTop:'4px',textAlign: m.tipo==='usuario' ? 'right' : 'left'}}>
+                {m.timestamp.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}
+              </div>
+            </div>
+          </div>
+        ))}
+        {cargando && (
+          <div style={{display:'flex',gap:'10px',alignItems:'flex-start'}}>
+            <div style={{width:'30px',height:'30px',borderRadius:'50%',background:'#dbeafe',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}}>🤖</div>
+            <div style={{background:'white',border:'1px solid #e2e8f0',borderRadius:'0 12px 12px 12px',padding:'12px 16px',boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
+              <div style={{display:'flex',gap:'4px',padding:'4px 0'}}>
+                {[0,1,2].map(i => <span key={i} style={{width:'8px',height:'8px',background:'#94a3b8',borderRadius:'50%',display:'inline-block',animation:`typing 1.2s ${i*0.2}s infinite`}}></span>)}
+              </div>
+              <div style={{fontSize:'12px',color:'#94a3b8',marginTop:'4px'}}>Consultando BD y analizando con IA...</div>
+            </div>
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{padding:'16px',borderTop:'1px solid #e2e8f0',background:'white'}}>
+        <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'12px'}}>
+          {PREGUNTAS_RAPIDAS.map((q,i) => (
+            <button key={i} onClick={() => setPregunta(q)} style={{background:'#f1f5f9',border:'1px solid #e2e8f0',color:'#475569',padding:'6px 12px',borderRadius:'16px',fontSize:'12px',cursor:'pointer',whiteSpace:'nowrap'}} type="button">{q}</button>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:'10px'}}>
+          <input
+            type="text"
+            value={pregunta}
+            onChange={e => setPregunta(e.target.value)}
+            onKeyDown={e => e.key==='Enter' && enviar()}
+            disabled={cargando}
+            placeholder="Ej: ¿cuántos reportes de vialidad se resolvieron este mes?"
+            style={{flex:1,border:'1.5px solid #e2e8f0',borderRadius:'10px',padding:'12px 16px',fontSize:'14px',outline:'none',background: cargando ? '#f8fafc' : 'white'}}
+          />
+          <button onClick={enviar} disabled={cargando || !pregunta.trim()} style={{background: cargando || !pregunta.trim() ? '#93c5fd' : '#2563eb',color:'white',border:'none',padding:'12px 20px',borderRadius:'10px',cursor: cargando ? 'not-allowed' : 'pointer',fontSize:'14px',fontWeight:'600'}} type="button">
+            {cargando ? '...' : '➤'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function DashboardMunicipal() {
   const navigate = useNavigate()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -499,12 +625,16 @@ function DashboardMunicipal() {
   const [modalNotas, setModalNotas] = useState('')
   const [modalEvidenciaCierre, setModalEvidenciaCierre] = useState('')
   const [modalFotoCierre, setModalFotoCierre] = useState(null)
+  const [respuestaCiudadanoIA, setRespuestaCiudadanoIA] = useState('')
+  const [generandoRespuesta, setGenerandoRespuesta] = useState(false)
   const [selectedReporteIds, setSelectedReporteIds] = useState([])
   const [bulkInspectorId, setBulkInspectorId] = useState('')
   const [bulkEstado, setBulkEstado] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [totalReportes, setTotalReportes] = useState(0)
+  const [seccionesColapsadas, setSeccionesColapsadas] = useState({})
+  const toggleSeccion = (nombre) => setSeccionesColapsadas(prev => ({ ...prev, [nombre]: !prev[nombre] }))
 
   // Estado para el Tour (Onboarding)
   const [runTour, setRunTour] = useState(false)
@@ -1066,6 +1196,19 @@ function DashboardMunicipal() {
       toast.error('Error al realizar el análisis detallado')
     } finally {
       setIsAnalyzing(false)
+    }
+  }
+
+  const handleGenerarRespuestaCiudadano = async () => {
+    if (!reporteSeleccionado?.id) return
+    setGenerandoRespuesta(true)
+    try {
+      const res = await iaRespuestaCiudadano(reporteSeleccionado.id, modalEvidenciaCierre)
+      setRespuestaCiudadanoIA(res.data.mensaje)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setGenerandoRespuesta(false)
     }
   }
 
@@ -1841,6 +1984,14 @@ function DashboardMunicipal() {
           {userInfo?.tipo === 'admin' && (
             <div className="nav-section">
               {isSidebarOpen && <p className="nav-section-label">Administración</p>}
+              <div
+                className={`nav-item-enterprise ${vistaActual === 'chat-ia' ? 'active' : ''}`}
+                onClick={() => setVistaActual('chat-ia')}
+              >
+                <span style={{fontSize:'18px'}}>🤖</span>
+                {isSidebarOpen && <span>Chat IA</span>}
+                {vistaActual === 'chat-ia' && isSidebarOpen && <div className="nav-dot"></div>}
+              </div>
               <div
                 className="nav-item-enterprise"
                 onClick={() => navigate('/admin')}
@@ -3155,96 +3306,125 @@ function DashboardMunicipal() {
               </div>
             )}
 
-            {/* Vista Tabla */}
-            {vistaActual === 'tabla' && (
-              <div className="table-view">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Código</th>
-                      <th>Fecha</th>
-                      <th>Ubicación</th>
-                      <th>Categoría</th>
-                      <th>IA / Producto</th>
-                      <th>Riesgo</th>
-                      <th>Estado</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <>
-                        {[...Array(5)].map((_, i) => (
-                          <tr key={i} className="skeleton-table-row">
-                            <td><Skeleton height="16px" /></td>
-                            <td><Skeleton height="16px" /></td>
-                            <td><Skeleton height="16px" /></td>
-                            <td><Skeleton height="16px" /></td>
-                            <td><Skeleton height="16px" width="80px" /></td>
-                            <td><Skeleton height="16px" width="100px" /></td>
-                            <td><Skeleton height="24px" width="60px" /></td>
-                          </tr>
-                        ))}
-                      </>
-                    ) : reportes.length === 0 ? (
-                      <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>
-                          No hay reportes disponibles
-                        </td>
-                      </tr>
-                    ) : (
-                      reportes.map(reporte => (
-                        <tr key={reporte.id || reporte.codigo_seguimiento}>
-                          <td>{reporte.codigo_seguimiento}</td>
-                          <td>{new Date(reporte.fecha_creacion).toLocaleDateString()}</td>
-                          <td>{reporte.direccion || reporte.direccion_completa || 'Sin dirección'}</td>
-                          <td>{reporte.categoria_nombre || 'Sin categoría'}</td>
-                          <td>
-                            {reporte.ai_metadata?.product ? (
-                              <div className="ai-badge-table" title={`Confianza: ${(reporte.ai_metadata.confidence * 100).toFixed(0)}%`}>
-                                <BrainIconSVG size={12} className="ai-icon-pulse" />
-                                <span>{reporte.ai_metadata.product}</span>
-                              </div>
-                            ) : (
-                              <span className="text-muted" style={{ opacity: 0.4 }}>—</span>
-                            )}
-                          </td>
-                          <td>
-                            {reporte.prediction ? (
-                              <span className={`risk-badge risk-${reporte.prediction.risk_level}`}>
-                                {(reporte.prediction.probability * 100).toFixed(0)}% ·{' '}
-                                {reporte.prediction.risk_level.toUpperCase()}
-                              </span>
-                            ) : (
-                              <span className="risk-badge risk-empty">Sin datos</span>
-                            )}
-                          </td>
-                          <td>
-                            <span className={`status-badge status-${reporte.estado}`}>
-                              {reporte.estado.toUpperCase()}
-                            </span>
-                          </td>
-                          <td>
-                            <button
-                              className="btn-action"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                console.log('Botón Ver clickeado para reporte:', reporte)
-                                handleVerDetalle(reporte)
-                              }}
-                              type="button"
-                            >
-                              <span>Ver</span>
-                            </button>
-                          </td>
-                        </tr>
+            {/* Vista Tabla — agrupada por sección (capa urbana) */}
+            {vistaActual === 'tabla' && (() => {
+              const reportesPorSeccion = reportes.reduce((acc, reporte) => {
+                const seccion = reporte.subcategoria?.capa?.nombre
+                  || reporte.categoria_nombre
+                  || 'Sin categoría'
+                if (!acc[seccion]) acc[seccion] = []
+                acc[seccion].push(reporte)
+                return acc
+              }, {})
+
+              const SECCION_EMOJIS = {
+                'Agua Potable y Alcantarillado': '💧',
+                'Vialidad': '🛣️',
+                'Señalización y Tránsito': '🚦',
+                'Alumbrado Público': '💡',
+                'Áreas Verdes y Plazas': '🌳',
+                'Infraestructura': '🔧',
+                'Seguridad Ciudadana': '🛡️',
+                'Emergencias y Riesgos': '🚨',
+                'Edificación y Urbanismo': '🏗️',
+                'Aseo y Ornato': '🗑️',
+                'Medio Ambiente': '♻️',
+                'Residuos y Basurales': '♻️',
+                'Baches y Pavimento': '🛣️',
+                'Iluminación': '💡',
+                'Semáforos y Señalética': '🚦',
+                'Sin categoría': '📋',
+              }
+
+              return (
+                <div className="secciones-view">
+                  {loading ? (
+                    <div style={{ padding: '20px' }}>
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} style={{ marginBottom: '12px', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+                          <div style={{ padding: '14px 20px', background: '#f8fafc' }}>
+                            <Skeleton height="18px" width="200px" />
+                          </div>
+                          {[...Array(3)].map((__, j) => (
+                            <div key={j} style={{ display: 'flex', gap: '16px', padding: '12px 16px', borderTop: '1px solid #f1f5f9' }}>
+                              <Skeleton height="14px" width="100px" />
+                              <Skeleton height="14px" width="140px" />
+                              <Skeleton height="14px" width="180px" />
+                              <Skeleton height="14px" width="60px" />
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  ) : Object.keys(reportesPorSeccion).length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px' }}>No hay reportes disponibles</div>
+                  ) : (
+                    Object.entries(reportesPorSeccion)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([seccion, items]) => (
+                        <div key={seccion} className="seccion-grupo">
+                          <div className="seccion-header" onClick={() => toggleSeccion(seccion)}>
+                            <div className="seccion-header-left">
+                              <span className="seccion-emoji">{SECCION_EMOJIS[seccion] || '📋'}</span>
+                              <h3 className="seccion-titulo">{seccion}</h3>
+                              <span className="seccion-count">{items.length} reportes</span>
+                              {items.filter(r => r.prioridad === 'urgente' || r.prioridad === 'alta').length > 0 && (
+                                <span className="seccion-urgente-badge">
+                                  🔴 {items.filter(r => r.prioridad === 'urgente' || r.prioridad === 'alta').length} urgentes
+                                </span>
+                              )}
+                            </div>
+                            <span className="seccion-chevron">{seccionesColapsadas[seccion] ? '▶' : '▼'}</span>
+                          </div>
+
+                          {!seccionesColapsadas[seccion] && (
+                            <div className="seccion-tabla-wrapper">
+                              <table className="seccion-tabla">
+                                <thead>
+                                  <tr>
+                                    <th>Código</th>
+                                    <th>Subcategoría</th>
+                                    <th>Ubicación</th>
+                                    <th>Prioridad</th>
+                                    <th>Estado</th>
+                                    <th>Fecha</th>
+                                    <th>Acción</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {items.map(reporte => (
+                                    <tr key={reporte.id} className={`seccion-row prioridad-row-${reporte.prioridad || 'normal'}`}>
+                                      <td><code className="codigo-cell">{reporte.codigo_seguimiento}</code></td>
+                                      <td>{reporte.subcategoria?.nombre || reporte.categoria_nombre || '—'}</td>
+                                      <td className="ubicacion-cell">{reporte.direccion || reporte.direccion_completa || 'Sin dirección'}</td>
+                                      <td>
+                                        <span className={`prioridad-badge prioridad-${reporte.prioridad || 'normal'}`}>
+                                          {reporte.prioridad || 'normal'}
+                                        </span>
+                                      </td>
+                                      <td>
+                                        <span className={`status-badge status-${reporte.estado}`}>
+                                          {reporte.estado?.toUpperCase()}
+                                        </span>
+                                      </td>
+                                      <td>{new Date(reporte.fecha_creacion).toLocaleDateString('es-CL')}</td>
+                                      <td>
+                                        <button className="btn-action" onClick={() => handleVerDetalle(reporte)} type="button">
+                                          Ver
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
                       ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Vista Estadísticas + Predicciones */}
             {vistaActual === 'estadisticas' && (
@@ -3601,6 +3781,34 @@ function DashboardMunicipal() {
         </main>
       </div>
 
+      {/* Vista Chat IA — solo admin */}
+      {vistaActual === 'chat-ia' && userInfo?.tipo === 'admin' && (
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'#f8fafc',zIndex:100,display:'flex',flexDirection:'column'}}>
+          {/* Header */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 24px',background:'white',borderBottom:'1px solid #e2e8f0',boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              <span style={{fontSize:'24px'}}>🤖</span>
+              <div>
+                <h2 style={{margin:0,fontSize:'18px',color:'#1e293b'}}>Asistente IA Municipal</h2>
+                <p style={{margin:0,fontSize:'12px',color:'#94a3b8'}}>Consulta la base de datos en lenguaje natural • Qwen3 8B (local)</p>
+              </div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:'6px',background:'#f0fdf4',color:'#15803d',padding:'6px 14px',borderRadius:'20px',fontSize:'12px',fontWeight:'600',border:'1px solid #bbf7d0'}}>
+                <span style={{width:'8px',height:'8px',background:'#22c55e',borderRadius:'50%',display:'inline-block'}}></span>
+                IA Local Activa
+              </div>
+              <button onClick={() => setVistaActual('dashboard')} style={{background:'#f1f5f9',border:'none',padding:'8px 16px',borderRadius:'8px',cursor:'pointer',fontSize:'13px',color:'#475569',fontWeight:'500'}}>
+                ✕ Cerrar
+              </button>
+            </div>
+          </div>
+
+          {/* Mensajes */}
+          <ChatIAAdmin />
+        </div>
+      )}
+
       {/* Modal Detalle */}
       {showModal && reporteSeleccionado && (
         <div
@@ -3876,6 +4084,28 @@ function DashboardMunicipal() {
                 accept="image/*"
                 onChange={(e) => setModalFotoCierre(e.target.files?.[0] || null)}
               />
+            </div>
+
+            <div className="respuesta-ciudadano-ia">
+              <button
+                type="button"
+                className="btn-generar-respuesta-ia"
+                onClick={handleGenerarRespuestaCiudadano}
+                disabled={generandoRespuesta}
+              >
+                {generandoRespuesta ? '⏳ Generando...' : '🤖 Generar respuesta al ciudadano'}
+              </button>
+              {respuestaCiudadanoIA && (
+                <div className="respuesta-ia-preview">
+                  <label>Mensaje generado (puedes editarlo):</label>
+                  <textarea
+                    value={respuestaCiudadanoIA}
+                    onChange={(e) => setRespuestaCiudadanoIA(e.target.value)}
+                    rows={4}
+                    className="respuesta-ia-textarea"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Panel de Validación */}

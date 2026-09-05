@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
       manifest: {
-        name: 'EcoAlerta Municipal',
-        short_name: 'EcoAlerta',
-        description: 'Gestión municipal de residuos e incidentes',
+        name: 'UrbanAlert Municipal',
+        short_name: 'UrbanAlert',
+        description: 'Gestión municipal de reportes e incidentes urbanos',
         theme_color: '#1a1a1a',
         background_color: '#1a1a1a',
         display: 'standalone',

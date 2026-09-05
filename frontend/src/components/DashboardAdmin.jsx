@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import apiClient from '../services/api'
+import { iaChatAdmin } from '../services/api'
 import { API_ROUTES } from '../config'
 import { toast } from './ToastContainer'
 import ModerationPanel from './ModerationPanel'
@@ -17,7 +18,11 @@ import {
   XCircle,
   MoreVertical,
   Map as MapIcon,
-  ArrowLeft
+  ArrowLeft,
+  MessageSquare,
+  Send,
+  Bot,
+  Database
 } from 'lucide-react'
 import './DashboardAdmin.css'
 
@@ -36,6 +41,17 @@ function DashboardAdmin() {
     tipo: 'ciudadano',
     telefono: ''
   })
+
+  const [mensajesChat, setMensajesChat] = useState([
+    { 
+      tipo: 'ia', 
+      texto: '👋 Hola, soy tu asistente de análisis municipal. Puedo consultar la base de datos en tiempo real.\n\nEjemplos de preguntas:\n• ¿Cuántos reportes hubo por departamento en los últimos 6 meses?\n• ¿Cuál es el tiempo promedio de resolución por categoría?\n• ¿Qué inspector tiene más reportes asignados?\n• ¿Cuántos reportes con SLA vencido hay actualmente?',
+      timestamp: new Date()
+    }
+  ])
+  const [preguntaChat, setPreguntaChat] = useState('')
+  const [cargandoChat, setCargandoChat] = useState(false)
+  const chatEndRef = useRef(null)
 
   useEffect(() => {
     if (vista === 'usuarios') {

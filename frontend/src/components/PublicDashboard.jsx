@@ -163,7 +163,7 @@ function PublicDashboard() {
             <div className="pd-header">
                 <div className="pd-logo">
                     <MapPin color="#228B22" />
-                    <h1>EcoAlerta <span className="highlight">Comunidad</span></h1>
+                    <h1>UrbanAlert <span className="highlight">Comunidad</span></h1>
                 </div>
 
                 <div className="pd-filters">

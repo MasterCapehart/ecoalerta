@@ -1,5 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from .ia_views import (
+    ia_clasificar_reporte, ia_detectar_duplicado, ia_generar_respuesta_ciudadano,
+    ia_indexar_reportes, ia_buscar_similares
+)
+from .ia_chat import ia_chat_admin, ia_resumen_departamento
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -43,6 +48,10 @@ from .views import (
     completar_tour,
     predicciones_espaciales,
     mis_estadisticas,
+    capas_urbanas_list,
+    departamentos_list,
+    subcategorias_por_capa,
+    municipio_config,
 )
 
 router = DefaultRouter()
@@ -50,6 +59,21 @@ router.register(r'reportes', ReporteViewSet, basename='reportes')
 router.register(r'categorias', CategoriaResiduoViewSet, basename='categorias')
 
 urlpatterns = [
+    # IA endpoints (Ollama / qwen3:8b + RAG)
+    path('ia/clasificar/', ia_clasificar_reporte, name='ia-clasificar'),
+    path('ia/duplicado/', ia_detectar_duplicado, name='ia-duplicado'),
+    path('ia/respuesta-ciudadano/', ia_generar_respuesta_ciudadano, name='ia-respuesta-ciudadano'),
+    path('ia/chat-admin/', ia_chat_admin, name='ia-chat-admin'),
+    path('ia/resumen-departamento/', ia_resumen_departamento, name='ia-resumen-departamento'),
+    # RAG endpoints
+    path('ia/indexar/', ia_indexar_reportes, name='ia-indexar'),
+    path('ia/buscar/', ia_buscar_similares, name='ia-buscar'),
+
+    # Capas urbanas, subcategorías y departamentos
+    path('capas/', capas_urbanas_list, name='capas-list'),
+    path('departamentos/', departamentos_list, name='departamentos-list'),
+    path('capas/<int:capa_id>/subcategorias/', subcategorias_por_capa, name='subcategorias-por-capa'),
+
     # Autenticación
     path('auth/login/', login_view, name='login'),
     path('auth/refresh/', refresh_token_view, name='refresh-token'),
@@ -127,6 +151,9 @@ urlpatterns = [
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+
+    # Configuración dinámica del municipio
+    path('municipio/', municipio_config, name='municipio-config'),
 
     # Router URLs
     path('', include(router.urls)),

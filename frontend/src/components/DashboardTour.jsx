@@ -7,7 +7,7 @@ const DashboardTour = ({ run, setRun, usuario, onTourComplete }) => {
     const steps = [
         {
             target: '.dashboard-container',
-            content: '¡Bienvenido al Nuevo Dashboard Municipal de EcoAlerta! Vamos a darte un rápido recorrido por las principales herramientas operativas.',
+            content: '¡Bienvenido al Nuevo Dashboard Municipal de UrbanAlert! Vamos a darte un rápido recorrido por las principales herramientas operativas.',
             placement: 'center',
             disableBeacon: true,
         },

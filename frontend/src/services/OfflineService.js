@@ -2,7 +2,7 @@ import { openDB } from 'idb'
 import { toast } from '../components/ToastContainer'
 import apiClient from './api'
 
-const DB_NAME = 'ecoalerta-offline-db'
+const DB_NAME = 'urbanalert-offline-db'
 const STORE_REPORTS = 'offline-reports'
 const STORE_ACTIONS = 'offline-actions'
 

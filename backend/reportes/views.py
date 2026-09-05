@@ -339,11 +339,13 @@ class ReporteViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Asignar usuario si está autenticado
+        # Asignar usuario y ubicación
+        from django.contrib.gis.geos import Point
+        ubicacion_pt = Point(float(lng), float(lat), srid=4326)
         if request.user.is_authenticated:
-            serializer.save(creado_por=request.user)
+            serializer.save(creado_por=request.user, ubicacion=ubicacion_pt)
         else:
-            serializer.save()
+            serializer.save(ubicacion=ubicacion_pt)
         
         reporte = serializer.instance
         
@@ -425,7 +427,19 @@ class ReporteViewSet(viewsets.ModelViewSet):
         
         logger.info(f"Reporte creado exitosamente: {reporte.codigo_seguimiento}")
         cache.delete('reportes_estadisticas')
-        
+
+        # Auto-indexar para RAG (en background, no bloquea la respuesta)
+        try:
+            import threading
+            from .rag_service import indexar_reporte as rag_indexar
+            threading.Thread(
+                target=rag_indexar,
+                args=(reporte.id,),
+                daemon=True
+            ).start()
+        except Exception:
+            pass
+
         return Response({
             'codigo_seguimiento': reporte.codigo_seguimiento,
             'mensaje': 'Reporte creado exitosamente',
@@ -755,6 +769,28 @@ class CategoriaResiduoViewSet(viewsets.ReadOnlyModelViewSet):
             cache.set(cache_key, categorias, 3600)
         
         return categorias
+
+
+def axes_lockout_response(request, credentials, *args, **kwargs):
+    """Respuesta JSON personalizada cuando Axes bloquea un usuario."""
+    from django.http import JsonResponse
+    from axes.models import AccessAttempt
+    import datetime
+
+    username = credentials.get('username', '')
+    try:
+        attempt = AccessAttempt.objects.filter(username=username).first()
+        intentos = attempt.failures_since_start if attempt else 0
+    except Exception:
+        intentos = 0
+
+    return JsonResponse({
+        'error': f'Cuenta bloqueada temporalmente por múltiples intentos fallidos. '
+                 f'Inténtalo de nuevo en 30 minutos.',
+        'codigo': 'CUENTA_BLOQUEADA',
+        'intentos': intentos,
+        'espera_minutos': 30,
+    }, status=429)
 
 
 @api_view(['POST', 'GET'])
@@ -2065,3 +2101,85 @@ def mis_estadisticas(request):
         logger.exception("Error en mis_estadisticas")
         return Response({"error": str(e)}, status=500)
 
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def capas_urbanas_list(request):
+    """Lista todas las capas urbanas activas con sus subcategorías y departamento"""
+    from .models import CapaUrbana
+    from .serializers import CapaUrbanaSerializer
+    capas = CapaUrbana.objects.filter(activa=True).select_related('departamento').prefetch_related('subcategorias').order_by('orden')
+    serializer = CapaUrbanaSerializer(capas, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def departamentos_list(request):
+    """Lista todos los departamentos municipales activos"""
+    from .models import DepartamentoMunicipal
+    from .serializers import DepartamentoSerializer
+    deptos = DepartamentoMunicipal.objects.filter(activo=True).order_by('nombre')
+    serializer = DepartamentoSerializer(deptos, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def subcategorias_por_capa(request, capa_id):
+    """Lista subcategorías de una capa específica"""
+    from .models import SubcategoriaUrbana
+    from .serializers import SubcategoriaSerializer
+    subs = SubcategoriaUrbana.objects.filter(capa_id=capa_id, activa=True).order_by('orden')
+    serializer = SubcategoriaSerializer(subs, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET', 'PUT', 'PATCH'])
+@permission_classes([AllowAny])
+def municipio_config(request):
+    """
+    GET /api/municipio/ → Configuración pública del municipio (sin auth)
+    PUT/PATCH /api/municipio/ → Actualizar config (solo admin)
+    """
+    from .models import ConfiguracionMunicipio
+    config = ConfiguracionMunicipio.get_config()
+
+    if request.method == 'GET':
+        return Response({
+            'nombre': config.nombre,
+            'region': config.region,
+            'pais': config.pais,
+            'mapa_lat': config.mapa_lat,
+            'mapa_lng': config.mapa_lng,
+            'mapa_zoom': config.mapa_zoom,
+            'bounds_norte': config.bounds_norte,
+            'bounds_sur': config.bounds_sur,
+            'bounds_este': config.bounds_este,
+            'bounds_oeste': config.bounds_oeste,
+            'logo_url': config.logo_url,
+            'color_primario': config.color_primario,
+            'color_secundario': config.color_secundario,
+            'email_contacto': config.email_contacto,
+            'telefono_contacto': config.telefono_contacto,
+            'sitio_web': config.sitio_web,
+            'direccion_municipio': config.direccion_municipio,
+            'slogan': config.slogan,
+        })
+
+    # PUT/PATCH solo para admins
+    if not request.user.is_authenticated or not (request.user.tipo == 'admin' or request.user.is_staff):
+        return Response({'error': 'No autorizado'}, status=403)
+
+    campos = [
+        'nombre', 'region', 'pais', 'mapa_lat', 'mapa_lng', 'mapa_zoom',
+        'bounds_norte', 'bounds_sur', 'bounds_este', 'bounds_oeste',
+        'logo_url', 'color_primario', 'color_secundario',
+        'email_contacto', 'telefono_contacto', 'sitio_web',
+        'direccion_municipio', 'slogan',
+    ]
+    for campo in campos:
+        if campo in request.data:
+            setattr(config, campo, request.data[campo])
+    config.save()
+    return Response({'ok': True, 'nombre': config.nombre})

@@ -9,7 +9,8 @@ from .ml.exceptions import PredictionModelNotFound, PredictionModelNotReady
 
 from .models import (
     Reporte, CategoriaResiduo, Usuario, Notificacion,
-    Tag, HistorialCambio, ComentarioPublico, BusquedaGuardada, ReporteImagen, CierreReporte
+    Tag, HistorialCambio, ComentarioPublico, BusquedaGuardada, ReporteImagen, CierreReporte,
+    DepartamentoMunicipal, CapaUrbana, SubcategoriaUrbana,
 )
 
 def _load_predictor():
@@ -87,7 +88,11 @@ class ReporteSerializer(serializers.ModelSerializer):
             "dias_abierto": dias_abierto,
         }
         
-        predictor = _load_predictor()
+        try:
+            predictor = _load_predictor()
+        except Exception:
+            predictor = None
+
         if predictor:
             try:
                 result = predictor.predict_from_payload(payload)
@@ -212,6 +217,23 @@ class BusquedaGuardadaSerializer(serializers.ModelSerializer):
         fields = ['id', 'nombre', 'parametros', 'fecha_creacion', 'veces_usado']
         read_only_fields = ['fecha_creacion', 'veces_usado']
 
+class DepartamentoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DepartamentoMunicipal
+        fields = ['id', 'nombre', 'descripcion', 'email_contacto', 'telefono']
+
+class SubcategoriaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubcategoriaUrbana
+        fields = ['id', 'nombre', 'descripcion', 'icono', 'sla_horas', 'prioridad_base', 'capa']
+
+class CapaUrbanaSerializer(serializers.ModelSerializer):
+    departamento = DepartamentoSerializer(read_only=True)
+    subcategorias = SubcategoriaSerializer(many=True, read_only=True)
+    class Meta:
+        model = CapaUrbana
+        fields = ['id', 'nombre', 'slug', 'descripcion', 'icono', 'color_hex', 'departamento', 'subcategorias']
+
 class PublicReporteSerializer(serializers.ModelSerializer):
     categoria_nombre = serializers.ReadOnlyField(source='categoria.nombre')
     lat = serializers.SerializerMethodField()
@@ -230,4 +252,12 @@ class PublicReporteSerializer(serializers.ModelSerializer):
         if obj.ubicacion:
             return obj.ubicacion.x
         return obj.ubicacion_lng
+
+class ComentarioPublicoSerializer(serializers.ModelSerializer):
+    codigo_reporte = serializers.ReadOnlyField(source='reporte.codigo_seguimiento')
+
+    class Meta:
+        model = ComentarioPublico
+        fields = ['id', 'reporte', 'codigo_reporte', 'nombre', 'email', 'comentario', 'fecha_creacion', 'moderado']
+
 

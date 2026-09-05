@@ -26,9 +26,10 @@ class DuplicateDetectionService:
         try:
             point = Point(float(lng), float(lat), srid=4326)
             
+            degree_distance = float(radius_meters) / 111000.0
             # Buscar reportes en el radio y que NO estén cerrados
             queryset = Reporte.objects.filter(
-                ubicacion__dwithin=(point, D(m=radius_meters))
+                ubicacion__dwithin=(point, degree_distance)
             ).exclude(
                 estado__in=['resuelto', 'cerrado', 'cancelado']
             )

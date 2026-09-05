@@ -2,9 +2,9 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15-alpine
+    image: postgis/postgis:15-3.4-alpine
     environment:
-      POSTGRES_DB: ecoalerta
+      POSTGRES_DB: urbanalert
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
@@ -46,7 +46,7 @@ services:
     environment:
       - DEBUG=True
       - DB_HOST=db
-      - DB_NAME=ecoalerta
+      - DB_NAME=urbanalert
       - DB_USER=postgres
       - DB_PASSWORD=postgres
       - REDIS_URL=redis://redis:6379/1

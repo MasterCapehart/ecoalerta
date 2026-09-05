@@ -162,7 +162,7 @@ class ReportsService:
         styles = getSampleStyleSheet()
         
         # Título
-        title = Paragraph("Reporte Estadístico - EcoAlerta", styles['Title'])
+        title = Paragraph("Reporte Estadístico - UrbanAlert", styles['Title'])
         elements.append(title)
         elements.append(Spacer(1, 0.2*inch))
         
@@ -256,7 +256,7 @@ class ReportsService:
         ws = wb.active
         ws.title = "Resumen"
         
-        ws['A1'] = "Reporte Estadístico - EcoAlerta"
+        ws['A1'] = "Reporte Estadístico - UrbanAlert"
         ws['A2'] = f"Período: {stats['periodo']['desde'].strftime('%d/%m/%Y')} - {stats['periodo']['hasta'].strftime('%d/%m/%Y')}"
         
         # Totales

@@ -30,7 +30,7 @@ class Command(BaseCommand):
                 username='administrador',
                 password='1234',
                 tipo='admin',
-                email='administrador@ecoalerta.cl',
+                email='administrador@urbanalert.cl',
                 is_staff=True,
                 is_superuser=True
             )

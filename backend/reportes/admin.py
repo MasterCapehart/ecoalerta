@@ -2,17 +2,22 @@ from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 from .models import (
     Reporte, CategoriaResiduo, Usuario, Notificacion,
-    Tag, HistorialCambio, ComentarioPublico, BusquedaGuardada, CierreReporte
+    Tag, HistorialCambio, ComentarioPublico, BusquedaGuardada, CierreReporte,
+    DepartamentoMunicipal, CapaUrbana, SubcategoriaUrbana, ConfiguracionMunicipio,
 )
 
 
 @admin.register(Reporte)
 class ReporteAdmin(SimpleHistoryAdmin):
-    list_display = ['codigo_seguimiento', 'categoria', 'estado', 'fecha_creacion', 'asignado_a']
-    list_filter = ['estado', 'categoria', 'fecha_creacion']
+    list_display = ['codigo_seguimiento', 'get_capa', 'subcategoria', 'categoria', 'estado', 'prioridad', 'fecha_creacion', 'asignado_a']
+    list_filter = ['estado', 'subcategoria__capa', 'categoria', 'prioridad', 'fecha_creacion']
     search_fields = ['codigo_seguimiento', 'descripcion', 'email']
     date_hierarchy = 'fecha_creacion'
-    
+
+    def get_capa(self, obj):
+        return obj.subcategoria.capa.nombre if obj.subcategoria else (obj.categoria.nombre if obj.categoria else '-')
+    get_capa.short_description = 'Capa / Categoría'
+
     fieldsets = (
         ('Información Básica', {
             'fields': ('codigo_seguimiento', 'categoria', 'descripcion', 'foto', 'email')
@@ -82,3 +87,27 @@ class CierreReporteAdmin(admin.ModelAdmin):
     list_display = ['reporte', 'cerrado_por', 'fecha_cierre']
     list_filter = ['fecha_cierre']
     search_fields = ['reporte__codigo_seguimiento', 'evidencia_texto']
+
+
+# --- Plataforma Multi-Capa 311 ---
+
+@admin.register(DepartamentoMunicipal)
+class DepartamentoMunicipalAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'email_contacto', 'telefono', 'activo']
+    list_filter = ['activo']
+    search_fields = ['nombre', 'email_contacto']
+
+
+@admin.register(CapaUrbana)
+class CapaUrbanaAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'slug', 'color_hex', 'icono', 'departamento', 'activa', 'orden']
+    list_filter = ['activa', 'departamento']
+    search_fields = ['nombre', 'slug', 'descripcion']
+    prepopulated_fields = {'slug': ('nombre',)}
+
+
+@admin.register(SubcategoriaUrbana)
+class SubcategoriaUrbanaAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'capa', 'sla_horas', 'prioridad_base', 'activa', 'orden']
+    list_filter = ['capa', 'prioridad_base', 'activa']
+    search_fields = ['nombre', 'descripcion']

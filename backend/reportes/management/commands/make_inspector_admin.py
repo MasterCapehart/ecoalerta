@@ -25,7 +25,7 @@ class Command(BaseCommand):
                 username='inspector',
                 password='1234',
                 tipo='admin',
-                email='inspector@ecoalerta.cl'
+                email='inspector@urbanalert.cl'
             )
             self.stdout.write(
                 self.style.SUCCESS('Usuario inspector creado como administrador (usuario: inspector, password: 1234)')
